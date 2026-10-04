@@ -54,7 +54,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200);self.send_header('Content-Type','image/png' if path.suffix.lower()=='.png' else 'image/jpeg');self.send_header('X-Content-Type-Options','nosniff');self.end_headers();self.wfile.write(body);return
             elif u.path=='/locales/zh-CN.json':
                 data=json.loads((ROOT/'locales/zh-CN.json').read_text(encoding='utf-8'))
-            elif u.path in ('/','/index.html','/style.css','/app.js','/live.js','/i18n.js','/archive.js','/archive.css'):
+            elif u.path in ('/','/index.html','/style.css','/app.js','/live.js','/i18n.js','/archive.js','/archive.css','/timeline.js'):
                 path=ROOT/'ui-preview'/('index.html' if u.path=='/' else u.path[1:]);body=path.read_bytes()
                 self.send_response(200);self.send_header('Content-Type',{'html':'text/html','css':'text/css','js':'application/javascript'}[path.suffix[1:]]+'; charset=utf-8');self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(body);return
             else:self.send_error(404);return

@@ -63,7 +63,7 @@ class ChatTests(unittest.TestCase):
     def test_transfer_history_is_available_without_player_selection(self):
         import json
         moves=[dict(player_name='Former player',date='2027-06-16',season='2027/28',direction='in',
-                    other_club='Former club',fee_display='€1800万',fee_eur_displayed=18000000,kind='transfer',note='',secret='DO_NOT_SEND')]
+                    other_club='Former club',fee_display='€18M',fee_eur_displayed=18000000,kind='transfer',note='',secret='DO_NOT_SEND')]
         for chosen in ([],[{'name':'Other player'}]):
             context=store.context_for(chosen,[],moves,'2035/36')
             parsed=json.loads(context)

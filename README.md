@@ -8,46 +8,21 @@ This is a bounded **agentic analytics workflow**: the model selects tools and ar
 
 > Implementation guide, updated October 3, 2026. Available data depends on imported saves. Evidence checks do not guarantee that every natural-language conclusion is correct.
 
-## Public source distribution
+## Scope
 
-This repository contains application code, English documentation, bilingual UI catalogs and synthetic unit tests. Personal FM saves, SQLite databases, transcripts, screenshots, manual stories, credentials and the private development Git history are intentionally excluded. This is a local application, not an already-hosted website or a preloaded demo.
+This is a personal project that runs locally on Windows. The repository contains application code, English documentation, bilingual UI catalogs and synthetic unit tests. Personal FM saves, SQLite databases, transcripts, screenshots, manual stories, credentials and the private development Git history are excluded.
 
-The application is currently tailored to a Leicester/Premier League archive. Other clubs and export formats may require code changes. ChatGPT-plan access depends on account/application eligibility; cloning this repository does not grant access or include credentials.
+The application is tailored to a Leicester/Premier League archive. Other clubs and export formats may require code changes.
 
-## Quick start
+## Workspace
 
-Use Windows with Git and [uv](https://docs.astral.sh/uv/getting-started/installation/) installed. From a new clone:
-
-```powershell
-git clone https://github.com/SpaceCowboy0707/fm_archive.git
-cd fm_archive
-./Setup.ps1
-./Import-Save.ps1 -SavePath 'C:\path\to\your-save.fm'
-./Start-Workspace.ps1
-```
-
-You can open the empty workspace before importing; data analysis requires your own compatible save. The first explicit save import must precede **Update latest save**. No private source dataset is bundled. Sign in through the website only when you want to enable chat.
-
-
-On Windows, double-click [`Start-Workspace.cmd`](Start-Workspace.cmd), or run:
-
-```powershell
-./Start-Workspace.ps1
-```
-
-| Address / control | Purpose |
-| --- | --- |
-| http://127.0.0.1:8502/ | Unified chat and archive workspace, background generation and evidence explorer |
-| `Start-Archive.ps1` / port 8501 | Optional legacy Streamlit fallback; not needed by the workspace |
-| Archive and data, bottom-left | Squad, statistics, league snapshots, transfers, stories, originals, SQL workbench and checks |
-| Workspace settings | Account, model, snapshot, season, competition, squad and character background |
-| English / 中文 | Switch interface language; new responses request the selected language |
+The workspace is a single local page containing the chat, the evidence explorer and the archive pages. **Archive and data** (bottom left) opens the squad, statistics, league snapshots, transfers, stories, originals, SQL workbench and checks. **Workspace settings** selects the account, model, snapshot, season, competition, squad and character background.
 
 English is the default repository and interface language. The workspace remembers the browser's language preference across chat and archive pages. The optional legacy Streamlit pages have their own language selector. Changing language does not rewrite stored chats, player or club names, original documents, SQL, or evidence payloads. An explicit request for another answer language can override the default.
 
 The new frontend uses HTML/CSS/JavaScript with a Python HTTP service. All eight archive pages render natively in the workspace, without new tabs or embedded Streamlit pages. They reuse the existing databases and validation functions. Questions remain chronological and collapsed by default, with the composer at the bottom.
 
-Services bind to loopback only. `127.0.0.1` refers to the computer running the application, not a public deployment. Closing a browser does not stop the service. `Setup.ps1` prepares the project environment; pinned dependencies are recorded in `uv.lock`.
+Services bind to loopback only; this is not a public deployment. Closing a browser does not stop the service. Pinned dependencies are recorded in `uv.lock`.
 
 ## Features
 
@@ -96,7 +71,7 @@ flowchart LR
 
 ### Importing a new save
 
-After FM finishes saving, run `Update-Latest.cmd` or use **Update latest save** on any archive page.
+After FM finishes saving, an import is triggered with **Update latest save** on any archive page.
 
 1. `src/sync_save.py` finds the newest `last save overwrite backup*.fm` in previously recorded game directories.
 2. It checks size and modification-time stability, acquires an import lock, and uses content SHA-256 to detect duplicates across core, extended and league imports.
@@ -104,13 +79,7 @@ After FM finishes saving, run `Update-Latest.cmd` or use **Update latest save** 
 4. `src/import_save.py` imports core visible fields, extended statistics and league snapshots in sequence.
 5. Each stage validates its own data. This is **not one global transaction across all stages**: earlier successful stages can remain if a later stage fails. Inspect the report and retry to complete missing stages.
 
-To select a file explicitly:
-
-```powershell
-./Import-Save.ps1 -SavePath 'C:\path\to\your-save.fm'
-```
-
-The stability wait, update lock and pre-update database backup belong to `sync_save.py`; directly specifying a path uses a different entry point. Ensure saving has finished before either route.
+A specific save file can also be imported directly. The stability wait, update lock and pre-update database backup belong to `sync_save.py`; directly specifying a path uses a different entry point.
 
 This is a **manually triggered import pipeline**, not a scheduled watcher. Importing does not invoke an LLM or upload the complete save to a model.
 
@@ -246,7 +215,7 @@ The program resolves `rows[0].goals` from tool call zero and compares both value
 
 **Matching `facts` does not certify every sentence in `analysis`.** The validator does not fully link every prose number to a reference or verify causal and tactical judgments. Comparison/title intent recognition uses limited bilingual patterns and can miss or misclassify questions.
 
-The model may correct arguments or query again after tool errors within the remaining budget. There is no automatic final-answer regeneration loop until validation passes, no automatic database repair, and no silent fallback to paid API access. A user-triggered retry creates new model usage.
+The model may correct arguments or query again after tool errors within the remaining budget. Tool errors are structured: `error_type` (`invalid_arguments`, `archive_format`, `incomplete_data`, `budget_exhausted`, …), `retryable`, and for argument problems the offending `field`, the `received` value and what was `expected` (for example the selected cutoff date, enum values or the matching club names). There is no automatic final-answer regeneration loop until validation passes, no automatic database repair, and no silent fallback to paid API access. A user-triggered retry creates new model usage.
 
 ## If the answer is wrong
 
@@ -269,7 +238,7 @@ Reproduce with a fixed sample, add a regression test, verify the tool result, th
 
 Open a question, select **View evidence**, then inspect:
 
-- **Overview:** saved requests, tool selection, completion/errors and evidence checks.
+- **Steps:** a timeline grouped by model round. It shows preparation, each request's `tool_choice`, the model's decision (which tools or answer), every tool call with its `#query_index`, arguments, SQL reads, processing rules, returned result or structured error, per-round usage and the final evidence check. Any step expands to full details or the raw event; minor events can be shown on demand.
 - **Query:** actual tool arguments and returned data.
 - **SQL:** fixed SQL, bound parameters, raw database row counts and elapsed time.
 - **Usage:** reported input/output/total and cached input. Missing reports are not zero.
@@ -336,12 +305,6 @@ Chat requests send questions, relevant history, selected context and tool result
 
 Git is not a save/database backup. Back up `db/`, saves, manual data, screenshots and originals separately. Use SQLite's backup API for live databases. Do not commit credentials or unrestricted save dumps.
 
-Run tests:
-
-```powershell
-.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -v
-```
-
 Tests cover archive isolation, deduplication, statistics, tools, evidence checks and job persistence. Model tests use mock responses, not paid generation. A passing suite is not proof of correct natural-language reasoning. After parser, model, prompt or tool changes, rerun relevant tests and manually inspect small, verifiable examples.
 
 Useful regression cases include duplicate saves, season rollover, zero minutes, null values, unread pages, ambiguous names, mixed competitions, games in hand, tied standings, invalid paths, interruptions, duplicate submissions, bilingual intent recognition and stable widget values across language changes.
@@ -351,6 +314,7 @@ Useful regression cases include duplicate saves, season rollover, zero minutes, 
 | File | Responsibility |
 | --- | --- |
 | `ui-preview/index.html`, `style.css`, `app.js`, `live.js` | Live workspace frontend; directory name is historical |
+| `ui-preview/timeline.js` | Step-by-step execution timeline in the evidence panel |
 | `ui-preview/i18n.js`, `src/i18n.py`, `locales/` | Interface localization and multilingual input aliases |
 | `ui-preview/server.py` | Local HTTP routes for accounts, models, chats, evidence and archive data |
 | `ui-preview/archive.js`, `archive.css`, `src/web_archive.py` | Native archive navigation, filters, tables, evidence images, read-only SQL and background imports |
@@ -370,6 +334,6 @@ Useful regression cases include duplicate saves, season rollover, zero minutes, 
 
 See the [manual story format](docs/manual-stories.md) and [conversation memory guide](data/conversations/README.md). Private development records are not included.
 
-## Public test scope
+## Test scope
 
-`python -m unittest discover -s tests -q` runs synthetic unit and mocked-service tests. Tests that require the private owner's save, screenshots or original conversation are not distributed. Run import and UI smoke checks with your own data before relying on a new parser version. Test execution does not call a live model.
+The suite in `tests/` contains synthetic unit and mocked-service tests. Tests that require the private save, screenshots or original conversation are kept out of this repository. Test execution does not call a live model.

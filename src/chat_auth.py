@@ -182,8 +182,8 @@ def response_failure(event,status=None):
                  'context_length_exceeded':"This conversation and its background exceed the model context limit. Reduce the scope.",
                  'server_error':"OpenAI could not complete this request. You can retry.",
                  'invalid_api_key':"Invalid login credentials. Sign in again."}.get(code,"OpenAI could not complete this response.")
-    detail='；'.join(f'{k}={v}' for k,v in details.items()) or "No error code provided"
-    if status is not None:detail=f'HTTP {status}；'+detail
+    detail='; '.join(f'{k}={v}' for k,v in details.items()) or "No error code provided"
+    if status is not None:detail=f'HTTP {status}; '+detail
     return ConnectionFailure(explanation+" Diagnostics: "+detail+". Your message is saved; the app will not automatically switch to paid API access.",code=code)
 
 def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on_tool=None,on_event=None,require_lookup=False,final_text_only=False):
@@ -193,6 +193,7 @@ def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on
     inputs=list(messages)
     started=time.monotonic()
     calls_used=0
+    tool_index=0
     evidence_ready=False
     allowed={t['name'] for t in tools or []}
     for round_index in range(7):
@@ -250,6 +251,9 @@ def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on
         except (requests.RequestException,ValueError):
             raise ConnectionFailure("The chat connection was interrupted. Please retry.") from None
         calls=[item for item in output if item.get('type')=='function_call']
+        emit('model_decision',"Model decided to call tools" if calls else "Model decided to answer",round=round_index+1,
+             decision='tool_calls' if calls else 'answer',tools=[c.get('name','') for c in calls],
+             output_items=[item.get('type') for item in output],text_characters=len(''.join(buffered_text)))
         if not calls:
             if tools and choice=='required':raise ConnectionFailure("A lookup was required, but the model returned no tool request. This response was not marked verified. Please retry.")
             if not received_text:
@@ -267,23 +271,27 @@ def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on
             if not call.get('call_id'):raise ConnectionFailure("The model tool request is missing its call identifier.")
             name=call.get('name','')
             arguments=call.get('arguments','')
-            emit('tool_requested',"The model requested a query tool",call_id=call['call_id'],name=name,arguments=arguments)
+            # query_index is the zero-based position evidence references use for this call.
+            query_index=tool_index;tool_index+=1
+            emit('tool_requested',"The model requested a query tool",call_id=call['call_id'],name=name,arguments=arguments,round=round_index+1,query_index=query_index,budget_used=calls_used,budget_limit=8)
+            tool_started=time.monotonic()
             if calls_used>=8:
-                result={'error':"Query budget reached. Answer from available evidence and describe the gaps."}
+                result=dict(error="Query budget reached. Answer from available evidence and describe the gaps.",error_type='budget_exhausted',retryable=False)
             elif name not in allowed or execute_tool is None:
-                result={'error':"This tool is not available. Only the provided read-only archive tools are allowed."}
+                result=dict(error="This tool is not available. Use one of the listed read-only archive tools.",error_type='invalid_arguments',field='name',received=name,expected=sorted(allowed),retryable=True)
                 calls_used+=1
             else:
                 calls_used+=1
                 result=execute_tool(name,arguments)
             serialized=json.dumps(result,ensure_ascii=False,separators=(',',':'))
             if len(serialized)>40000:
-                result={'error':"The result is too large. Narrow the scope or request another page."}
+                result=dict(error=f"The result is too large ({len(serialized)} characters, limit 40000). Narrow the scope or request another page.",error_type='result_too_large',retryable=True)
                 serialized=json.dumps(result,ensure_ascii=False)
             if name in ('story_memory','squad_attack_comparison','season_statistics','player_timeline','injury_history','transfer_history','league_team_data','player_profile','title_race_status') and not result.get('error'):
                 evidence_ready=True
             if on_tool:on_tool({'name':name,'arguments':arguments,'result':result})
-            emit('tool_result',"Query result ready to return to the model",call_id=call['call_id'],name=name,result=result,note="This is the actual function_call_output. The model can use it after the next request is sent.")
+            emit('tool_result',"Query result ready to return to the model",call_id=call['call_id'],name=name,result=result,round=round_index+1,query_index=query_index,
+                 status='error' if result.get('error') else 'ok',duration_ms=round((time.monotonic()-tool_started)*1000,1),output_characters=len(serialized),note="This is the actual function_call_output. The model can use it after the next request is sent.")
             inputs.append({'type':'function_call_output','call_id':call['call_id'],'output':serialized})
         if len(json.dumps(inputs,ensure_ascii=False))>350000:
             raise ConnectionFailure("This round accumulated too much query data. Reduce the date or player scope and retry.")

@@ -4,7 +4,7 @@ from datetime import datetime,timezone
 from contextlib import closing
 from src import chat_store as store,chat_auth as auth
 from src.archive import snapshots,squad
-from src.chat_tools import ArchiveTools,TOOLS,AGENT_INSTRUCTIONS
+from src.chat_tools import ArchiveTools,TOOLS,AGENT_INSTRUCTIONS,LABELS
 from src.evidence_gate import INSTRUCTIONS,validate_answer
 from src.chat_routing import unsupported_request
 from src.lore import load_lore
@@ -73,6 +73,8 @@ def submit(a):
 def run(jid,room,mid,cfg,local=None):
     events=[];queries=[];start=time.monotonic();raw='';state='failed';text="This response did not complete.";draft=None
     def event(e):
+        name=(e.get('details') or {}).get('name')
+        if e.get('kind') in ('tool_requested','tool_result') and name in LABELS:e={**e,'details':{**e['details'],'label':LABELS[name]}}
         events.append({**e,'elapsed_seconds':round(time.monotonic()-start,2)})
         store.save_workflow(mid,events)
     def query(q):

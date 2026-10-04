@@ -226,7 +226,7 @@ else:
         st.dataframe(current_extra['checks'],hide_index=True)
         if any(r['status']!='ok' for r in current_extra['checks']):
             st.warning("injury_types name validation failed. Independently validated injury dates are retained; names remain empty.")
-    st.write(f"FM build：{snapshot['build']} · fmsave：{snapshot['fmsave_version']}")
+    st.write(f"FM build: {snapshot['build']} · fmsave: {snapshot['fmsave_version']}")
     st.write(f"Missing names: {sum(not p['name'] for p in players)} / Missing contract expiry: {sum(not p['contract_end'] for p in players)}")
     st.caption("The allowlist is checked at export, import and squad read time. CA, PA, hidden personality and reputation values are not stored.")
     st.caption("Backup checksum (SHA-256): " + snapshot["sha256"])

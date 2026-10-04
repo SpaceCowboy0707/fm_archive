@@ -27,8 +27,10 @@ class LocalizationTests(unittest.TestCase):
     pass  # Private integration fixture is intentionally not published.
     def test_repository_product_source_is_english(self):
         import re
-        for path in [ROOT/'app.py',* (ROOT/'src').glob('*.py')]:
+        sources=[ROOT/'app.py',*(ROOT/'src').glob('*.py'),*(ROOT/'ui-preview').glob('*.js'),*(ROOT/'ui-preview').glob('*.html'),*(ROOT/'ui-preview').glob('*.py')]
+        for path in sources:
             if path.name=='i18n.py':continue
             # The language selector's native label is the sole intentional UI exception.
             text=path.read_text(encoding='utf-8').replace('\u4e2d\u6587','')
-            self.assertIsNone(re.search('[\u4e00-\u9fff]',text),str(path))
+            # CJK ideographs plus CJK/full-width punctuation such as \uff1b \uff08 \u3002 left over from translation.
+            self.assertIsNone(re.search('[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]',text),str(path))

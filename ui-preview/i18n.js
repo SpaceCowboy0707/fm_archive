@@ -4,7 +4,7 @@
   window.uiLanguage=saved==='zh-CN'?'zh-CN':'en';
   let catalog={},patterns=[];
   const source=new WeakMap(),attrs=new WeakMap();
-  const protectedSelector='.archive-value,.answer-text,.turn-title,#title,pre,#livePeople,input,textarea,script,style';
+  const protectedSelector='.no-tr,.archive-value,.answer-text,.turn-title,#title,pre,#livePeople,input,textarea,script,style';
   const escapeRegex=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   window.tr=function(text){
     if(window.uiLanguage!=='zh-CN'||typeof text!=='string')return text;

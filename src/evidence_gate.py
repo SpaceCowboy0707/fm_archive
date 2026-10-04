@@ -73,7 +73,7 @@ def validate_answer(raw,queries,cutoff,question=""):
             if covered!=set(range(total)):
                 a=json.loads(filters)
                 scope=' / '.join(str(a[k]) for k in ('club_name','player_id','season','section','kind','start_date','end_date') if a.get(k) is not None)
-                warnings.append(f'{tool_name}（{scope}): retrieved {len(covered.intersection(range(total)))}/{total} records. Unread records remain unknown; do not claim complete totals, rankings or comparisons for this scope.')
+                warnings.append(f'{tool_name} ({scope}): retrieved {len(covered.intersection(range(total)))}/{total} records. Unread records remain unknown; do not claim complete totals, rankings or comparisons for this scope.')
         for pid in set(ids):
             if not any(q['name']=='player_profile' and a.get('player_id')==pid and q['result'].get('season_statistics') for _,q,a in successful):warnings.append("A comparison player's attributes and competition splits are missing. Only describe available data; do not make definitive superiority or starter-replacement recommendations")
             if not any(q['name']=='player_timeline' and a.get('player_id')==pid and a.get('section')=='matches' and any(r.get('appearance_status')=='confirmed_minutes' for r in q['result'].get('rows',[])) for _,q,a in successful):warnings.append("A comparison player's confirmed match evidence is missing. Only describe available data; do not make definitive superiority or starter-replacement recommendations")
@@ -97,7 +97,7 @@ def validate_answer(raw,queries,cutoff,question=""):
                 warnings.append("Relevant queries failed or returned no records. No data fact can be established; an empty result does not prove an event never happened.")
             else:errors.append("No verifiable fact references")
     except json.JSONDecodeError as exc:
-        errors.append(f'Answer is not valid JSON: line {exc.lineno}, column {exc.colno} ({exc.msg}）');doc={}
+        errors.append(f'Answer is not valid JSON: line {exc.lineno}, column {exc.colno} ({exc.msg})');doc={}
     except (ValueError,KeyError,TypeError,IndexError) as exc:
         detail=str(exc) if isinstance(exc,ValueError) else "Invalid reference path or field type"
         errors.append("Structured answer validation failed: "+detail);doc={}
@@ -106,7 +106,7 @@ def validate_answer(raw,queries,cutoff,question=""):
     conclusions=[]
     for _,q,_ in successful:
         if q['name']=='title_race_status':
-            conclusions.append(str(q['result'].get('club_name',"Target club"))+' · '+str(q['result'].get('as_of',''))+'：'+("The strict maximum-points condition is satisfied: mathematically clinched." if q['result']['mathematically_clinched'] else "The strict maximum-points condition does not establish a clinch. This does not prove that the title is still undecided under every tie-break scenario."))
+            conclusions.append(str(q['result'].get('club_name',"Target club"))+' · '+str(q['result'].get('as_of',''))+': '+("The strict maximum-points condition is satisfied: mathematically clinched." if q['result']['mathematically_clinched'] else "The strict maximum-points condition does not establish a clinch. This does not prove that the title is still undecided under every tie-break scenario."))
     text=''
     if conclusions:text+="\n\n**Programmatic conclusion**\n\n"+'\n'.join(conclusions)
     if not title_question:
@@ -135,7 +135,7 @@ def partial_report(queries):
         count=len(g['rows']);total=g['total']
         if total is None:continue
         label={'league_team_data':"Team data",'injury_history':"Injury records",'season_statistics':"Season statistics"}.get(name,name)
-        lines.append(f"- {label}: retrieved {count}/{total} records; through {g['date']}。")
+        lines.append(f"- {label}: retrieved {count}/{total} records; through {g['date']}.")
         if name=='league_team_data' and g['a'].get('section')=='stats' and count==total:
             rows=sorted(g['rows'].values(),key=lambda x:x.get('minutes') or 0,reverse=True)[:6]
             lines.append("\nFully retrieved "+g['a'].get('season','')+" season / "+g['a'].get('kind','')+" statistics; the six players with the most minutes follow:\n")

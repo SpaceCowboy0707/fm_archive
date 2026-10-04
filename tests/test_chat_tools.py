@@ -86,6 +86,23 @@ class ToolTests(unittest.TestCase):
         self.assertIn('error',self.tools.execute('injury_history',{**args,'end_date':'2036-05-01'}))
         self.assertIn('error',self.tools.execute('injury_history',{**args,'player_id':'invented'}))
 
+    def test_argument_errors_name_the_field_for_self_correction(self):
+        args=dict(player_id='p',start_date='2035-10-01',end_date='2036-02-11',offset=0)
+        late=self.tools.execute('injury_history',{**args,'end_date':'2036-05-01'})
+        self.assertEqual((late['error_type'],late['field'],late['received'],late['retryable']),('invalid_arguments','end_date','2036-05-01',True))
+        self.assertIn('2036-02-11',late['error'])
+        self.assertEqual(self.tools.execute('injury_history',{**args,'start_date':'2035-02-30'})['field'],'start_date')
+        self.assertEqual(self.tools.execute('injury_history',{**args,'player_id':'invented'})['field'],'player_id')
+        season=self.tools.execute('season_statistics',dict(season='2035-36',player_id=None,kind='overall',scope='all',offset=0))
+        self.assertEqual((season['field'],season['received']),('season','2035-36'))
+        kind=self.tools.execute('season_statistics',dict(season='2035/36',player_id=None,kind='league_cup',scope='all',offset=0))
+        self.assertEqual(kind['field'],'kind');self.assertIn('continental',kind['expected'])
+        missing=self.tools.execute('find_players',dict(query='Page'))
+        self.assertEqual(missing['field'],'offset');self.assertIn('offset',missing['error'])
+        self.assertEqual(self.tools.execute('find_players','{not json')['field'],'arguments')
+        unknown=self.tools.execute('run_sql',dict(query='x'))
+        self.assertEqual(unknown['field'],'name');self.assertIn('find_players',unknown['expected'])
+
     def test_pagination_and_trace_persistence(self):
         first=self.tools._page([{'n':i} for i in range(50)],0)
         second=self.tools._page([{'n':i} for i in range(50)],first['next_offset'])
