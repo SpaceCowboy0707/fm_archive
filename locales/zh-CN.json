@@ -1315,5 +1315,6 @@
   "Sending evidence errors back for one repair attempt": "把证据错误发回模型，修正一次",
   "Repair skipped: evidence too large to resend": "证据过大，跳过修正",
   "Evidence check after repair": "修正后的证据检查",
-  "Repair attempt incomplete": "修正请求未完成"
+  "Repair attempt incomplete": "修正请求未完成",
+  "Repair output was unusable": "修正结果无法使用"
 }

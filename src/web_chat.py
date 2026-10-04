@@ -5,7 +5,7 @@ from contextlib import closing
 from src import chat_store as store,chat_auth as auth
 from src.archive import snapshots,squad
 from src.chat_tools import ArchiveTools,TOOLS,AGENT_INSTRUCTIONS,LABELS
-from src.evidence_gate import INSTRUCTIONS,validate_answer
+from src.evidence_gate import INSTRUCTIONS,validate_answer,failed_references,apply_fixes,strip_fence
 from src.chat_routing import unsupported_request
 from src.lore import load_lore
 from src.i18n import translate
@@ -73,28 +73,52 @@ def submit(a):
 REPAIR_INSTRUCTIONS="Your previous structured answer failed the evidence check. Return only the complete corrected JSON object. Fix every listed reference: query is the tool result's query_index, list positions are the record's row_index, and value is copied exactly from the tool result. If a statement cannot be supported by the tool results, remove its reference and soften or remove the statement. Do not invent values. No tools are available in this request.\n"
 
 
+PATCH_INSTRUCTIONS="Some evidence references in your structured answer failed the check. Do not rewrite the answer. Return only JSON of the form {\"fixes\":[{\"reference\":<number>,\"fact\":{\"query\":<query_index>,\"path\":[...],\"value\":<exact value>}}]} with exactly one fix per failed reference. query is the tool result's query_index, list positions are the record's row_index, and value is copied exactly from the tool result. Use \"fact\":null only when no tool result supports that reference. No tools are available in this request.\n"
+
+
 def repair_answer(cfg,draft,verdict,queries,events,event,language_line):
-    """One tool-free attempt to fix a failed structured answer against the same evidence; returns (draft, verdict)."""
+    """One tool-free attempt to fix a failed structured answer against the same evidence; returns (draft, verdict).
+
+    When every error concerns individual references, only those references are regenerated and the
+    analysis text is kept verbatim. Other failures (invalid JSON or structure) need a full rewrite.
+    """
     evidence=json.dumps([dict(query_index=i,name=q['name'],arguments=q['arguments'],result=q['result']) for i,q in enumerate(queries)],ensure_ascii=False,separators=(',',':'))
     if len(evidence)>350000:
         event(dict(kind='evidence_repair',title="Repair skipped: evidence too large to resend",details=dict(errors=verdict['errors'],evidence_characters=len(evidence))))
         return draft,verdict
+    failed=failed_references(verdict['errors'])
     event(dict(kind='evidence_repair',title="Sending evidence errors back for one repair attempt",details=dict(
-        errors=verdict['errors'],previous_draft=draft,evidence_characters=len(evidence),
-        note="One tool-free model request with the same tool results. The corrected answer is checked again; it is not published unless it passes.")))
+        mode='patch' if failed else 'rewrite',references=failed,errors=verdict['errors'],previous_draft=draft,evidence_characters=len(evidence),
+        note=("Only the failed references are regenerated; the analysis text is kept unchanged." if failed else "The whole answer is regenerated because the draft itself was invalid.")
+             +" One tool-free model request with the same tool results; the result is checked again and published only if it passes.")))
     offset=sum(e.get('kind')=='model_request' for e in events)
     def shifted(e):
         d=e.get('details') or {}
         event({**e,'details':{**d,'round':d['round']+offset,'phase':'repair'}} if 'round' in d else e)
-    inputs=[dict(role='user',content=cfg['question']),
-            dict(role='user',content='Tool results by query_index:\n'+evidence),
-            dict(role='assistant',content=draft),
-            dict(role='user',content='Evidence check errors:\n'+'\n'.join('- '+e for e in verdict['errors']))]
-    try:repaired=''.join(auth.stream_reply(cfg['account'],cfg['model'],inputs,REPAIR_INSTRUCTIONS+INSTRUCTIONS+language_line,on_event=shifted,final_text_only=True))
+    notes=[]
+    try:
+        if failed:
+            doc=json.loads(strip_fence(draft))
+            failed_facts=[dict(reference=n,fact=doc['facts'][n-1],error=next(e for e in verdict['errors'] if e.startswith(f'Reference {n}:'))) for n in failed]
+            inputs=[dict(role='user',content='Answer analysis, unchanged:\n'+doc['analysis']),
+                    dict(role='user',content='Failed references:\n'+json.dumps(failed_facts,ensure_ascii=False)),
+                    dict(role='user',content='Tool results by query_index:\n'+evidence)]
+            fixes=''.join(auth.stream_reply(cfg['account'],cfg['model'],inputs,PATCH_INSTRUCTIONS,on_event=shifted,final_text_only=True))
+            repaired,removed=apply_fixes(draft,fixes,failed)
+            if removed:notes.append(f"{removed} evidence reference(s) had no supporting tool result and were removed during repair; the statements they supported are not program-verified.")
+        else:
+            inputs=[dict(role='user',content=cfg['question']),
+                    dict(role='user',content='Tool results by query_index:\n'+evidence),
+                    dict(role='assistant',content=draft),
+                    dict(role='user',content='Evidence check errors:\n'+'\n'.join('- '+e for e in verdict['errors']))]
+            repaired=''.join(auth.stream_reply(cfg['account'],cfg['model'],inputs,REPAIR_INSTRUCTIONS+INSTRUCTIONS+language_line,on_event=shifted,final_text_only=True))
     except auth.ConnectionFailure as exc:
         event(dict(kind='error',title="Repair attempt incomplete",details=dict(message=str(exc))))
         return draft,verdict
-    result=validate_answer(repaired,queries,cfg['snapshot']['game_date'],cfg['question'])
+    except (ValueError,KeyError,IndexError,TypeError) as exc:
+        event(dict(kind='error',title="Repair output was unusable",details=dict(message=str(exc) if isinstance(exc,ValueError) else type(exc).__name__)))
+        return draft,verdict
+    result=validate_answer(repaired,queries,cfg['snapshot']['game_date'],cfg['question'],notes=notes)
     event(dict(kind='evidence_recheck',title="Evidence check after repair",details={k:v for k,v in result.items() if k!='text'}))
     return repaired,result
 

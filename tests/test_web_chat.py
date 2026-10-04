@@ -40,30 +40,55 @@ class WebJobTests(unittest.TestCase):
         m=store.messages(self.room)[-1]
         self.assertEqual(m['status'],'complete');self.assertIn("Analysis of available data",m['text']);self.assertEqual(len(m['queries']),1)
         self.assertEqual(web.jobs(self.room)[0]['state'],'complete')
-    def test_failed_references_get_one_tool_free_repair(self):
+    def test_failed_references_are_fixed_without_rewriting_the_answer(self):
+        fact=lambda row:dict(query=0,path=['rows',row,'goals'],value=31)
+        first=json.dumps(dict(season='2035/36',comparison_player_ids=[],facts=[dict(query=0,path=['rows',0,'goals'],value=4),fact(0)],analysis="Player A scored 31"))
+        calls=self.run_with_repair(first,json.dumps(dict(fixes=[dict(reference=2,fact=fact(1))])))
+        self.assertEqual(len(calls),2)
+        repair_args,repair_kw=calls[1]
+        self.assertIsNone(repair_kw.get('tools'))
+        self.assertIn('"fixes"',repair_args[3])
+        failed=json.loads(repair_args[2][1]['content'].split('\n',1)[1])
+        self.assertEqual([f['reference'] for f in failed],[2]);self.assertIn("cites 31, but the tool returned 4",failed[0]['error'])
+        m=store.messages(self.room)[-1]
+        self.assertEqual(m['status'],'complete');self.assertIn("Player A scored 31",m['text'])
+        kinds=[e['kind'] for e in m['workflow']]
+        self.assertLess(kinds.index('evidence_check'),kinds.index('evidence_repair'));self.assertIn('evidence_recheck',kinds)
+        self.assertEqual(next(e for e in m['workflow'] if e['kind']=='evidence_repair')['details']['mode'],'patch')
+    def run_with_repair(self,first,second):
         r=web.submit(self.args)
         tool=MagicMock();tool._data.return_value=[]
         self.stack.enter_context(patch.object(web,'ArchiveTools',return_value=tool))
         self.stack.enter_context(patch.object(web,'squad',return_value=[]));self.stack.enter_context(patch.object(web,'load_lore',return_value=[]))
-        answer=lambda row:json.dumps(dict(season='2035/36',comparison_player_ids=[],facts=[dict(query=0,path=['rows',row,'goals'],value=31)],analysis="Camarda scored 31"))
         calls=[]
         def stream(*args,**kw):
-            calls.append(kw)
+            calls.append((args,kw))
             if len(calls)==1:
                 kw['on_tool'](dict(name='season_statistics',arguments={'season':'2035/36'},result=dict(query_index=0,snapshot_date='2036-04-03',total=2,offset=0,next_offset=None,rows=[dict(row_index=0,goals=4),dict(row_index=1,goals=31)])))
-                yield answer(0)
-            else:
-                self.assertIsNone(kw.get('tools'))
-                self.assertIn("cites 31, but the tool returned 4",args[2][-1]['content'])
-                yield answer(1)
+                yield first
+            else:yield second
         self.stack.enter_context(patch.object(web.auth,'stream_reply',side_effect=stream))
         with store.connect() as c:cfg=json.loads(c.execute('select config from web_jobs').fetchone()[0])
         web.run(r['id'],self.room,r['assistant_id'],cfg)
-        self.assertEqual(len(calls),2)
+        return calls
+    def test_unsupported_reference_is_dropped_with_a_visible_note(self):
+        first=json.dumps(dict(season='2035/36',comparison_player_ids=[],facts=[dict(query=0,path=['rows',1,'goals'],value=31),dict(query=0,path=['rows',5,'goals'],value=9)],analysis="Analysis"))
+        self.run_with_repair(first,json.dumps(dict(fixes=[dict(reference=2,fact=None)])))
         m=store.messages(self.room)[-1]
-        self.assertEqual(m['status'],'complete');self.assertIn("Camarda scored 31",m['text'])
-        kinds=[e['kind'] for e in m['workflow']]
-        self.assertLess(kinds.index('evidence_check'),kinds.index('evidence_repair'));self.assertIn('evidence_recheck',kinds)
+        self.assertEqual(m['status'],'complete');self.assertIn("removed during repair",m['text'])
+    def test_invalid_draft_gets_full_rewrite(self):
+        good=json.dumps(dict(season='2035/36',comparison_player_ids=[],facts=[dict(query=0,path=['rows',1,'goals'],value=31)],analysis="Rewritten analysis"))
+        calls=self.run_with_repair('{not json',good)
+        self.assertEqual(calls[1][0][2][-1]['content'].split('\n')[0],'Evidence check errors:')
+        m=store.messages(self.room)[-1]
+        self.assertEqual(m['status'],'complete');self.assertIn("Rewritten analysis",m['text'])
+        self.assertEqual(next(e for e in m['workflow'] if e['kind']=='evidence_repair')['details']['mode'],'rewrite')
+    def test_bad_repair_output_keeps_the_failure(self):
+        first=json.dumps(dict(season='2035/36',comparison_player_ids=[],facts=[dict(query=0,path=['rows',0,'goals'],value=31)],analysis="Analysis"))
+        self.run_with_repair(first,json.dumps(dict(fixes=[dict(reference=9,fact=None)])))
+        m=store.messages(self.room)[-1]
+        self.assertEqual(m['status'],'incomplete')
+        self.assertIn("Repair output was unusable",[e['title'] for e in m['workflow']])
     def test_failure_keeps_question_and_logs(self):
         r=web.submit(self.args)
         self.stack.enter_context(patch.object(web,'ArchiveTools',side_effect=RuntimeError('synthetic')))

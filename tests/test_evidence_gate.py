@@ -91,6 +91,21 @@ class EvidenceTests(unittest.TestCase):
         q=self.query();q['result']['snapshot_date']='2036-04-01'
         self.assertFalse(validate_answer(self.doc(),[q],'2036-03-04')['repairable'])
         self.assertTrue(validate_answer('{broken',[],'2036-03-04')['repairable'])
+    def test_empty_list_can_be_cited_but_records_cannot(self):
+        q=self.query();q['result']['latest_return_estimates']=[];q['result']['rows'][0]['history']=[{'date':'2036-01-01'}]
+        doc=json.loads(self.doc());doc['facts'].append(dict(query=0,path=['latest_return_estimates'],value=[]))
+        self.assertTrue(validate_answer(json.dumps(doc),[q],'2036-03-04')['passed'])
+        doc['facts'][-1]=dict(query=0,path=['rows',0,'history'],value=[{'date':'2036-01-01'}])
+        self.assertFalse(validate_answer(json.dumps(doc),[q],'2036-03-04')['passed'])
+    def test_fixes_replace_only_failed_references(self):
+        from src.evidence_gate import apply_fixes,failed_references
+        draft=json.dumps(dict(season='2035/36',comparison_player_ids=[],facts=[dict(query=0,path=['a'],value=1),dict(query=0,path=['b'],value=2)],analysis="Unchanged prose"))
+        self.assertEqual(failed_references(["Reference 2: query 0 ...","Reference 2: other"]),[2])
+        self.assertIsNone(failed_references(["Reference 2: x","Query cutoff date mismatch"]))
+        raw,removed=apply_fixes(draft,'```json\n{"fixes":[{"reference":2,"fact":null}]}\n```',[2])
+        self.assertEqual(removed,1);self.assertEqual(json.loads(raw)['facts'],[dict(query=0,path=['a'],value=1)]);self.assertEqual(json.loads(raw)['analysis'],"Unchanged prose")
+        for bad in ('{"fixes":[]}','{"fixes":[{"reference":1,"fact":null}]}','{"fixes":[{"reference":2,"fact":5}]}','[]'):
+            with self.assertRaises(ValueError):apply_fixes(draft,bad,[2])
     def test_invalid_draft_never_published(self):
         r=validate_answer("Already champions!",[],'2036-03-04',"Is the championship secure")
         self.assertFalse(r['passed']);self.assertNotIn("Already champions!",r['text'])

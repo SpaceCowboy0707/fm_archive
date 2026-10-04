@@ -4,7 +4,7 @@ import math
 import re
 from src.i18n import INPUT_ALIASES
 
-INSTRUCTIONS="Evidence validation is enabled. After querying, the final answer must be one JSON object without code fences: {\"season\":\"2035/36\",\"comparison_player_ids\":[],\"facts\":[{\"query\":0,\"path\":[\"rows\",0,\"goals\"],\"value\":10}],\"analysis\":\"Complete user-facing Markdown answer and limitations\"}. query is the query_index field printed in that tool result, path locates a scalar field in the result, and value must match exactly in value and type. Every record in a returned list carries its own row_index: use it as the list position in path (for example [\"rows\",<row_index>,\"goals\"]) and never count positions yourself. Copy values exactly as returned, without rounding. At most 600 fact references. analysis should answer the original question naturally with useful numerical tables, comparisons and conditional recommendations, not just a qualitative summary. Reference important raw numbers in facts; explain derived calculations. Do not invent numbers or claim that all interpretation is program-verified. Start with a concise judgment, select relevant metrics, explain their meaning, then describe actual limitations. Similar minutes do not equal similar opponents, competitions or roles; more defensive events do not alone imply greater ability. For player comparisons, include both real identities and query each player_profile and season player_timeline(matches), completing relevant pages. season is the season being analyzed. Title-race questions must call title_race_status; the program publishes the mathematical condition, so analysis must not independently announce a clinch. Missing data still requires this structure. If all relevant queries fail or are empty, facts may be empty; explain attempted scope, actual errors, absent fields and unavailable conclusions. An unread unrelated page does not invalidate all available evidence. Analyze complete data without asserting totals for incomplete scopes. Missing profiles or opponents permit descriptions, not definitive replacement recommendations. Follow the requested response language for analysis; JSON keys and reference paths remain unchanged."
+INSTRUCTIONS="Evidence validation is enabled. After querying, the final answer must be one JSON object without code fences: {\"season\":\"2035/36\",\"comparison_player_ids\":[],\"facts\":[{\"query\":0,\"path\":[\"rows\",0,\"goals\"],\"value\":10}],\"analysis\":\"Complete user-facing Markdown answer and limitations\"}. query is the query_index field printed in that tool result, path locates a scalar field in the result, and value must match exactly in value and type. Every record in a returned list carries its own row_index: use it as the list position in path (for example [\"rows\",<row_index>,\"goals\"]) and never count positions yourself. Copy values exactly as returned, without rounding. To show that no records were returned, a path may end at an empty list or object and cite [] or {}. At most 600 fact references. analysis should answer the original question naturally with useful numerical tables, comparisons and conditional recommendations, not just a qualitative summary. Reference important raw numbers in facts; explain derived calculations. Do not invent numbers or claim that all interpretation is program-verified. Start with a concise judgment, select relevant metrics, explain their meaning, then describe actual limitations. Similar minutes do not equal similar opponents, competitions or roles; more defensive events do not alone imply greater ability. For player comparisons, include both real identities and query each player_profile and season player_timeline(matches), completing relevant pages. season is the season being analyzed. Title-race questions must call title_race_status; the program publishes the mathematical condition, so analysis must not independently announce a clinch. Missing data still requires this structure. If all relevant queries fail or are empty, facts may be empty; explain attempted scope, actual errors, absent fields and unavailable conclusions. An unread unrelated page does not invalidate all available evidence. Analyze complete data without asserting totals for incomplete scopes. Missing profiles or opponents permit descriptions, not definitive replacement recommendations. Follow the requested response language for analysis; JSON keys and reference paths remain unchanged."
 
 
 def championship(rows,club_uid):
@@ -29,7 +29,8 @@ def at_path(value,path):
         if isinstance(value,dict) and isinstance(key,str):value=value[key]
         elif isinstance(value,list) and type(key) is int and 0<=key<len(value):value=value[key]
         else:raise ValueError("Field path does not exist")
-    if value is not None and type(value) not in (str,int,float,bool):raise ValueError("Only scalar references are allowed")
+    # An empty list or object may be cited to show that no records were returned.
+    if value is not None and type(value) not in (str,int,float,bool) and value not in ([],{}):raise ValueError("Only scalar references or empty lists/objects are allowed")
     if isinstance(value,float) and not math.isfinite(value):raise ValueError("Non-finite number")
     return value
 
@@ -54,13 +55,43 @@ NEEDS_NEW_QUERIES={"Current title-race judgment lacks standings for the selected
                    "Title-race question lacks the programmatic points calculation","Pagination totals are inconsistent"}
 
 
-def validate_answer(raw,queries,cutoff,question=""):
-    errors=[];facts=[];warnings=[]
+def strip_fence(raw):
+    cleaned=raw.strip()
+    if cleaned.startswith('```') and cleaned.endswith('```'):
+        cleaned=re.sub(r'^```(?:json)?\s*','',cleaned,flags=re.IGNORECASE)[:-3].strip()
+    return cleaned
+
+
+REFERENCE_ERROR=re.compile(r'^Reference (\d+): ')
+
+
+def failed_references(errors):
+    """Reference numbers when every error concerns an individual reference; otherwise None (needs a full rewrite)."""
+    numbers=[REFERENCE_ERROR.match(e) for e in errors]
+    return sorted({int(m.group(1)) for m in numbers}) if errors and all(numbers) else None
+
+
+def apply_fixes(raw,fixes_raw,failed):
+    """Replace or drop only the failed references; the analysis text is kept verbatim. Returns (raw, removed)."""
+    doc=json.loads(strip_fence(raw))
+    fixes=json.loads(strip_fence(fixes_raw))
+    if not isinstance(fixes,dict) or not isinstance(fixes.get('fixes'),list):raise ValueError('Repair must be {"fixes":[...]}')
+    replaced={}
+    for fix in fixes['fixes']:
+        if not isinstance(fix,dict) or set(fix)!={'reference','fact'} or fix['reference'] not in failed:raise ValueError("Each fix must name one failed reference")
+        if fix['fact'] is not None and not isinstance(fix['fact'],dict):raise ValueError("A fix must be a fact object or null")
+        replaced[fix['reference']]=fix['fact']
+    if set(replaced)!=set(failed):raise ValueError("Every failed reference needs exactly one fix")
+    doc['facts']=[replaced.get(n,f) for n,f in enumerate(doc['facts'],1)]
+    removed=sum(f is None for f in doc['facts'])
+    doc['facts']=[f for f in doc['facts'] if f is not None]
+    return json.dumps(doc,ensure_ascii=False),removed
+
+
+def validate_answer(raw,queries,cutoff,question="",notes=()):
+    errors=[];facts=[];warnings=list(notes)
     try:
-        cleaned=raw.strip()
-        if cleaned.startswith('```') and cleaned.endswith('```'):
-            cleaned=re.sub(r'^```(?:json)?\s*','',cleaned,flags=re.IGNORECASE)[:-3].strip()
-        doc=json.loads(cleaned)
+        doc=json.loads(strip_fence(raw))
         if not isinstance(doc,dict) or set(doc)!={'season','comparison_player_ids','facts','analysis'}:raise ValueError("Answer structure does not match the validation schema")
         if not isinstance(doc['season'],str) or not isinstance(doc['analysis'],str) or not isinstance(doc['facts'],list) or len(doc['facts'])>600:raise ValueError("Invalid answer fields")
         if not re.fullmatch(r'\d{4}/\d{2}',doc['season']):raise ValueError("Invalid season format")
@@ -119,7 +150,8 @@ def validate_answer(raw,queries,cutoff,question=""):
                 errors.append(f'{label}: {where} cites {json.dumps(f["value"],ensure_ascii=False)}, but the tool returned {json.dumps(actual,ensure_ascii=False)}'+located(q['result'],f['path'],f['value']));continue
             prefix='Original conversation only; not verified game facts · ' if q['name']=='story_memory' else ''
             facts.append(prefix+f"Tool {q['name']} · {json.dumps(f['path'],ensure_ascii=False)} = {json.dumps(actual,ensure_ascii=False)}")
-        if not facts:
+        # When references were cited but failed, those errors already explain the gap and remain repairable.
+        if not facts and not any(REFERENCE_ERROR.match(e) for e in errors):
             unavailable=bool(queries) and all(q['result'].get('error') or ('rows' in q['result'] and not q['result']['rows']) for q in queries)
             if unavailable:
                 warnings.append("Relevant queries failed or returned no records. No data fact can be established; an empty result does not prove an event never happened.")
