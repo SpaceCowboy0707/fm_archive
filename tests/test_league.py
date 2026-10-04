@@ -70,4 +70,14 @@ class LeagueTests(unittest.TestCase):
         self.assertEqual(events[0]['kind'],'sqlite_read')
         self.assertEqual(events[-1]['kind'],'data_processed')
 
+    def test_unmatched_club_lists_the_season_directory(self):
+        la.store(payload('2035-08-01','2035/36'),self.db)
+        tools=ArchiveTools({'game_date':'2035-08-15'},self.db)
+        args=dict(season='2035/36',club_name='Leicester',section='teams',kind='league',offset=0)
+        miss=tools.execute('league_team_data',args)
+        self.assertEqual((miss['error_type'],miss['field']),('invalid_arguments','club_name'))
+        self.assertIn('Club 3 (uid 3)',miss['expected']);self.assertEqual(len(miss['expected']),20)
+        self.assertEqual(tools.execute('league_team_data',{**args,'club_name':'3'})['rows'][0]['club_name'],'Club 3')
+        self.assertEqual(tools.execute('league_team_data',{**args,'season':'2030/31'})['field'],'season')
+
 if __name__=='__main__':unittest.main()

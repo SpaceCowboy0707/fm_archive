@@ -15,6 +15,8 @@ RESOURCE='https://api.openai.com/v1'
 SCOPES='openid profile email offline_access resource.invoke chatgpt.tokens.use.direct'
 PRIVATE=ROOT/'.private'
 LOCK=threading.RLock()
+# Per-response tool budget; several independent calls may share one model round.
+MAX_TOOL_CALLS=12
 
 class ConnectionFailure(Exception):
     def __init__(self,message,code=None):
@@ -197,11 +199,11 @@ def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on
     evidence_ready=False
     allowed={t['name'] for t in tools or []}
     for round_index in range(7):
-        final_only=round_index==6 or calls_used>=8
+        final_only=round_index==6 or calls_used>=MAX_TOOL_CALLS
         body={'model':model,'input':list(inputs),'instructions':instructions,'store':False,'stream':True}
         choice='none' if final_only else 'required' if require_lookup and not evidence_ready else 'auto'
         if tools:
-            body.update(tools=tools,tool_choice=choice,parallel_tool_calls=False)
+            body.update(tools=tools,tool_choice=choice,parallel_tool_calls=True)
         if final_only and require_lookup and not evidence_ready:
             body['instructions']+="\nThe query budget is exhausted without concrete evidence. Describe attempted queries and gaps only; do not assert unverified performance conclusions."
             emit('evidence_missing',"Query budget exhausted without concrete evidence",note="Only gaps can be reported; verification has not succeeded.")
@@ -273,9 +275,9 @@ def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on
             arguments=call.get('arguments','')
             # query_index is the zero-based position evidence references use for this call.
             query_index=tool_index;tool_index+=1
-            emit('tool_requested',"The model requested a query tool",call_id=call['call_id'],name=name,arguments=arguments,round=round_index+1,query_index=query_index,budget_used=calls_used,budget_limit=8)
+            emit('tool_requested',"The model requested a query tool",call_id=call['call_id'],name=name,arguments=arguments,round=round_index+1,query_index=query_index,budget_used=calls_used,budget_limit=MAX_TOOL_CALLS)
             tool_started=time.monotonic()
-            if calls_used>=8:
+            if calls_used>=MAX_TOOL_CALLS:
                 result=dict(error="Query budget reached. Answer from available evidence and describe the gaps.",error_type='budget_exhausted',retryable=False)
             elif name not in allowed or execute_tool is None:
                 result=dict(error="This tool is not available. Use one of the listed read-only archive tools.",error_type='invalid_arguments',field='name',received=name,expected=sorted(allowed),retryable=True)

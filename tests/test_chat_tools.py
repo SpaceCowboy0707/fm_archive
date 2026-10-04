@@ -65,7 +65,7 @@ class ToolTests(unittest.TestCase):
         self.assertNotIn('DO_NOT_SEND',json.dumps(self.tools.execute('find_players',dict(query='Page',offset=0))))
         self.assertIn('error',self.tools.execute('run_sql',dict(query='DROP TABLE snapshots')))
         self.assertIn('error',self.tools.execute('find_players',dict(query='Page',offset=-1)))
-        self.assertEqual(self.tools.execute('find_players',dict(query="' OR 1=1 --",offset=0))['total'],0)
+        self.assertEqual(self.tools.execute('find_players',dict(query="' OR 1=1 --",offset=0))['field'],'query')
         con=self.tools._connect()
         with self.assertRaises(sqlite3.OperationalError):con.execute('DELETE FROM snapshots')
         con.close()
@@ -85,6 +85,24 @@ class ToolTests(unittest.TestCase):
         self.assertEqual([r['goals'] for r in rows],[3,5])
         self.assertIn('error',self.tools.execute('injury_history',{**args,'end_date':'2036-05-01'}))
         self.assertIn('error',self.tools.execute('injury_history',{**args,'player_id':'invented'}))
+
+    def test_club_names_match_across_languages_and_short_forms(self):
+        from src.chat_tools import match_clubs
+        clubs=[(673,'莱斯特城足球俱乐部'),(679,'曼彻斯特城足球俱乐部'),(680,'曼联足球俱乐部'),(728,'托特纳姆热刺足球俱乐部')]
+        uids=lambda q:[u for u,_ in match_clubs(q,clubs)]
+        for query in ('Leicester','leicester city f.c.','Leicester City FC','莱斯特','莱斯特城足球俱乐部','狐狸城','673'):
+            self.assertEqual(uids(query),[673],query)
+        self.assertEqual(uids('Man City'),[679]);self.assertEqual(uids('曼城'),[679])
+        self.assertEqual(uids('Man Utd'),[680]);self.assertEqual(uids('Spurs'),[728]);self.assertEqual(uids('热刺'),[728])
+        self.assertEqual(uids('Manchester'),[679,680])
+        self.assertEqual(uids('Chelsea'),[]);self.assertEqual(uids('FC'),[])
+
+    def test_player_search_hints_transliteration_and_spelling(self):
+        cjk=self.tools.execute('find_players',dict(query='卡马尔达',offset=0))
+        self.assertEqual(cjk['field'],'query');self.assertIn('Latin script',cjk['error'])
+        typo=self.tools.execute('find_players',dict(query='Paje',offset=0))
+        self.assertEqual(typo['expected'],['Louis Page'])
+        self.assertIn('Latin script',self.tools.execute('transfer_history',dict(player_name='佩奇',start_date='2035-07-01',end_date='2036-02-11',offset=0))['error'])
 
     def test_rows_carry_their_position_for_evidence_paths(self):
         rows=self.tools.execute('find_players',dict(query='Page',offset=0))['rows']
@@ -226,6 +244,19 @@ class AgentLoopTests(unittest.TestCase):
         self.assertIn('identity_key',bodies[1]['input'][-1]['output'])
         self.assertEqual(bodies[2]['input'][-1]['call_id'],'two')
         self.assertTrue(all(b['store'] is False for b in bodies))
+
+    def test_independent_calls_share_one_round(self):
+        calls=[dict(type='function_call',call_id=str(i),name=name,arguments=args) for i,(name,args) in enumerate(
+            [('find_players','{"query":"Page","offset":0}'),('archive_coverage','{}'),('find_players','{"query":"Shaw","offset":0}')])]
+        bodies=[];traces=[]
+        replies=iter([Stream(calls),Stream(text='Answer')])
+        def post(*args,**kwargs):bodies.append(kwargs['json']);return next(replies)
+        with patch.object(auth,'access_token',return_value='synthetic'),patch.object(auth.requests,'post',side_effect=post):
+            text=''.join(auth.stream_reply('cid','model',[dict(role='user',content='Question')],'',TOOLS,lambda n,a:{'rows':[]},traces.append))
+        self.assertEqual(text,'Answer');self.assertEqual(len(bodies),2)
+        self.assertTrue(bodies[0]['parallel_tool_calls'])
+        self.assertEqual([t['result']['query_index'] for t in traces],[0,1,2])
+        self.assertEqual([i['call_id'] for i in bodies[1]['input'] if i.get('type')=='function_call_output'],['0','1','2'])
 
     def test_required_lookup_rejects_no_tool_answer(self):
         with patch.object(auth,'access_token',return_value='synthetic'),patch.object(auth.requests,'post',return_value=Stream(text='Unchecked answer')):

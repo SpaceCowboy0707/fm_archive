@@ -211,6 +211,8 @@ Defined in [`src/chat_tools.py`](src/chat_tools.py). Account, chat creation and 
 | `squad_attack_comparison` | `season`, `club_name`, `min_minutes` | League attack totals, per90, natural-position ranks and percentiles; no overall ability score |
 | `title_race_status` | `season`, `club_name` | Strict maximum-points sufficient condition using 20 clubs; no tie-break or probability model |
 
+Names are bilingual in practice: club names come from the save in Chinese, player names are in Latin script, and questions mix both. Club arguments match stored names, the aliases in [`locales/club-aliases.json`](locales/club-aliases.json) (English full and short names, common Chinese short names) or a club uid, ignoring case, accents and suffixes such as FC. A club argument that matches nothing (or, where one club is required, more than one) returns an error listing that season's clubs with their English names and uids. A player search with no match returns close spellings, or a transliteration hint when the query is not in Latin script.
+
 Use `identity_key` returned by player search, not an invented ID. Dates are game dates bounded by the selected snapshot. Use returned `next_offset` for pagination.
 
 `league_team_data.stats` contains **player competition statistics**, not an independent advanced team-statistics endpoint. `expected_goals` is player xG, `expected_assists` is xA, and goalkeeper `expected_goals_prevented` is not team xGA. “Not retrieved this time” does not establish “absent from the database.”
@@ -304,7 +306,7 @@ Open Archive and data → **Database workbench** for schema, DDL, views, single-
 | Budget | Current implementation |
 | --- | --- |
 | Model requests | Up to seven rounds; at most six query rounds, then a final-answer round |
-| Tool calls | At most eight; parallel tool calls disabled |
+| Tool calls | At most twelve; several independent calls may be requested in one round |
 | Ordinary pages | Up to 40 rows, usually bounded to roughly 24,000 serialized characters |
 | One tool output | Above 40,000 characters becomes an explicit oversized-result error, not silent truncation |
 | Accumulated query context | Stop appending above 350,000 serialized input characters |
