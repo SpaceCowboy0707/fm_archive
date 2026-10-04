@@ -1,0 +1,9 @@
+[project]
+name = "leicester-dynasty-archive"
+version = "0.1.0"
+description = "Local, spoiler-free Leicester City save archive"
+requires-python = ">=3.12,<3.13"
+dependencies = ["fmsave==0.5.4", "streamlit>=1.50,<2", "requests>=2.32,<3", "PyJWT[crypto]>=2.10,<3"]
+
+[tool.uv]
+package = false

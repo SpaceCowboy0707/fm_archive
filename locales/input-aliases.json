@@ -1,0 +1,39 @@
+{
+  "weather": "天气|气温|下雨|下雪|weather|forecast|temperature|rain|snow",
+  "archive": "\\bfm\\d*\\b|存档|游戏|比赛|球场|赛季|快照|snapshot|match|season|game|save",
+  "comparison": [
+    "比较",
+    "谁更",
+    "首发",
+    "替换",
+    " vs ",
+    "对比",
+    "compare",
+    "comparison",
+    "better",
+    "starter",
+    "replace",
+    "versus"
+  ],
+  "title": [
+    "冠军",
+    "夺冠",
+    "争冠",
+    "champion",
+    "title race",
+    "win the league",
+    "league title"
+  ],
+  "current": [
+    "现在",
+    "当前",
+    "稳",
+    "now",
+    "current",
+    "secure"
+  ],
+  "club_aliases": [
+    "leicester",
+    "莱斯特"
+  ]
+}
