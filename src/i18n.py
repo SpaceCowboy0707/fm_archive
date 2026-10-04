@@ -17,6 +17,8 @@ for key,value in CATALOG.items():
 
 def translate(text,language='en'):
     if language!='zh-CN' or not isinstance(text,str):return text
+    # Blank lines are layout, never message IDs.
+    if not text.strip():return text
     if text in CATALOG:return CATALOG[text]
     stripped=text.strip()
     if stripped in CATALOG:return text.replace(stripped,CATALOG[stripped],1)

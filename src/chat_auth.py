@@ -283,9 +283,11 @@ def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on
             else:
                 calls_used+=1
                 result=execute_tool(name,arguments)
+            # Evidence references copy this instead of counting calls.
+            result={'query_index':query_index,**result}
             serialized=json.dumps(result,ensure_ascii=False,separators=(',',':'))
             if len(serialized)>40000:
-                result=dict(error=f"The result is too large ({len(serialized)} characters, limit 40000). Narrow the scope or request another page.",error_type='result_too_large',retryable=True)
+                result=dict(query_index=query_index,error=f"The result is too large ({len(serialized)} characters, limit 40000). Narrow the scope or request another page.",error_type='result_too_large',retryable=True)
                 serialized=json.dumps(result,ensure_ascii=False)
             if name in ('story_memory','squad_attack_comparison','season_statistics','player_timeline','injury_history','transfer_history','league_team_data','player_profile','title_race_status') and not result.get('error'):
                 evidence_ready=True

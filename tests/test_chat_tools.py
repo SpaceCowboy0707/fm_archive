@@ -86,6 +86,11 @@ class ToolTests(unittest.TestCase):
         self.assertIn('error',self.tools.execute('injury_history',{**args,'end_date':'2036-05-01'}))
         self.assertIn('error',self.tools.execute('injury_history',{**args,'player_id':'invented'}))
 
+    def test_rows_carry_their_position_for_evidence_paths(self):
+        rows=self.tools.execute('find_players',dict(query='Page',offset=0))['rows']
+        self.assertEqual([r['row_index'] for r in rows],list(range(len(rows))))
+        self.assertEqual(list(rows[0])[0],'row_index')
+
     def test_argument_errors_name_the_field_for_self_correction(self):
         args=dict(player_id='p',start_date='2035-10-01',end_date='2036-02-11',offset=0)
         late=self.tools.execute('injury_history',{**args,'end_date':'2036-05-01'})

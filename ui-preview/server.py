@@ -52,6 +52,11 @@ class Handler(BaseHTTPRequestHandler):
             elif u.path=='/api/archive/image':
                 path=web_archive.evidence_image(a.get('id',[''])[0]);body=path.read_bytes()
                 self.send_response(200);self.send_header('Content-Type','image/png' if path.suffix.lower()=='.png' else 'image/jpeg');self.send_header('X-Content-Type-Options','nosniff');self.end_headers();self.wfile.write(body);return
+            elif u.path=='/crest.png':
+                # Optional local image, Git-ignored; the page falls back to the text crest when absent.
+                path=ROOT/'ui-preview'/'crest.png'
+                if not path.is_file():self.send_error(404);return
+                body=path.read_bytes();self.send_response(200);self.send_header('Content-Type','image/png');self.send_header('Cache-Control','max-age=86400');self.send_header('X-Content-Type-Options','nosniff');self.end_headers();self.wfile.write(body);return
             elif u.path=='/locales/zh-CN.json':
                 data=json.loads((ROOT/'locales/zh-CN.json').read_text(encoding='utf-8'))
             elif u.path in ('/','/index.html','/style.css','/app.js','/live.js','/i18n.js','/archive.js','/archive.css','/timeline.js'):

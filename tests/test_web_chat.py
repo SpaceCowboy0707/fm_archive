@@ -40,6 +40,30 @@ class WebJobTests(unittest.TestCase):
         m=store.messages(self.room)[-1]
         self.assertEqual(m['status'],'complete');self.assertIn("Analysis of available data",m['text']);self.assertEqual(len(m['queries']),1)
         self.assertEqual(web.jobs(self.room)[0]['state'],'complete')
+    def test_failed_references_get_one_tool_free_repair(self):
+        r=web.submit(self.args)
+        tool=MagicMock();tool._data.return_value=[]
+        self.stack.enter_context(patch.object(web,'ArchiveTools',return_value=tool))
+        self.stack.enter_context(patch.object(web,'squad',return_value=[]));self.stack.enter_context(patch.object(web,'load_lore',return_value=[]))
+        answer=lambda row:json.dumps(dict(season='2035/36',comparison_player_ids=[],facts=[dict(query=0,path=['rows',row,'goals'],value=31)],analysis="Camarda scored 31"))
+        calls=[]
+        def stream(*args,**kw):
+            calls.append(kw)
+            if len(calls)==1:
+                kw['on_tool'](dict(name='season_statistics',arguments={'season':'2035/36'},result=dict(query_index=0,snapshot_date='2036-04-03',total=2,offset=0,next_offset=None,rows=[dict(row_index=0,goals=4),dict(row_index=1,goals=31)])))
+                yield answer(0)
+            else:
+                self.assertIsNone(kw.get('tools'))
+                self.assertIn("cites 31, but the tool returned 4",args[2][-1]['content'])
+                yield answer(1)
+        self.stack.enter_context(patch.object(web.auth,'stream_reply',side_effect=stream))
+        with store.connect() as c:cfg=json.loads(c.execute('select config from web_jobs').fetchone()[0])
+        web.run(r['id'],self.room,r['assistant_id'],cfg)
+        self.assertEqual(len(calls),2)
+        m=store.messages(self.room)[-1]
+        self.assertEqual(m['status'],'complete');self.assertIn("Camarda scored 31",m['text'])
+        kinds=[e['kind'] for e in m['workflow']]
+        self.assertLess(kinds.index('evidence_check'),kinds.index('evidence_repair'));self.assertIn('evidence_recheck',kinds)
     def test_failure_keeps_question_and_logs(self):
         r=web.submit(self.args)
         self.stack.enter_context(patch.object(web,'ArchiveTools',side_effect=RuntimeError('synthetic')))

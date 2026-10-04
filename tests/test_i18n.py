@@ -12,6 +12,12 @@ class LocalizationTests(unittest.TestCase):
         self.assertEqual(translate('Current squad','zh-CN'),'\u5f53\u524d\u540d\u5355')
         self.assertEqual(translate('A private original story','zh-CN'),'A private original story')
         self.assertIn('13',translate('Loaded 13 available models; select one under Chat model.','zh-CN'))
+    def test_blank_lines_and_fragments_are_not_translated(self):
+        from src.i18n import CATALOG
+        for fragment in ('',' ','(',' (','Page','Page '):self.assertNotIn(fragment,CATALOG)
+        text="This response failed evidence checks; the unverified analysis is not displayed.\n\n- Reference 1"
+        self.assertEqual(translate(text,'zh-CN').split('\n')[1],'')
+        self.assertEqual(translate('\n\n','zh-CN'),'\n\n')
     def test_bilingual_weather_and_game_scope(self):
         for question in ('Will it rain tomorrow?', '\u660e\u5929\u5929\u6c14\u600e\u4e48\u6837'):
             self.assertIsNotNone(unsupported_request(question))

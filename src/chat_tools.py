@@ -71,6 +71,14 @@ def argument_error(exc):
     return dict(error=str(exc),error_type='invalid_arguments',field=exc.field,received=received,expected=exc.expected,retryable=True)
 
 
+def index_rows(result):
+    """Label every row of top-level record lists with its position, so evidence paths copy it instead of counting."""
+    for key,value in list(result.items()):
+        if isinstance(value,list) and value and all(isinstance(r,dict) for r in value):
+            result[key]=[{'row_index':i,**{k:v for k,v in r.items() if k!='row_index'}} for i,r in enumerate(value)]
+    return result
+
+
 def normalized(value):
     return ''.join(c for c in unicodedata.normalize('NFKD',value.casefold()) if not unicodedata.combining(c))
 
@@ -160,7 +168,7 @@ class ArchiveTools:
         try:
             if name=='story_memory':
                 from src.story_memory import search
-                return search(a['query'],a['offset'],on_event=self.on_event)
+                return index_rows(search(a['query'],a['offset'],on_event=self.on_event))
             with closing(self._connect()) as con:
                 result=self._query(con,name,a)
                 if self.on_event:
@@ -180,7 +188,7 @@ class ArchiveTools:
                         'matched_records':result.get('total'),'returned_records':len(result.get('rows',[])),
                         'next_offset':result.get('next_offset'),
                         'note':"These are actual data processing rules, not the model's internal thoughts. Returned data follows."}})
-                return result
+                return index_rows(result)
         except ToolArgumentError as exc:
             return argument_error(exc)
         except (ValueError,TypeError,KeyError) as exc:

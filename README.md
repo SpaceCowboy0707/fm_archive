@@ -32,6 +32,7 @@ flowchart LR
         V --> T[Fixed parameterised SQL + Python metrics]
         T -->|function_call_output| M
         M -->|final JSON answer| G[Evidence gate]
+        G -.->|reference errors, one repair| M
         G -->|pass / warnings| R[Published answer + limitations]
         G -->|hard failure| F[Blocked, draft and evidence kept]
     end
@@ -236,7 +237,7 @@ A structured answer has this form (illustrative values, not a real player):
 }
 ```
 
-The program resolves `rows[0].goals` from tool call zero and compares both value and type. `null` may be referenced as missing, never changed into zero. A null `next_offset` means no next page, not a missing metric.
+The program resolves `rows[0].goals` from tool call zero and compares both value and type. Every tool result carries its `query_index`, and every record in a returned list carries its `row_index`, so references copy positions instead of counting them; long result lists made counting errors common. Every reference is checked, and each failure names the reference, query, path, cited value and returned value, plus where the cited value actually appears when it is found elsewhere in the same list. `null` may be referenced as missing, never changed into zero. A null `next_offset` means no next page, not a missing metric.
 
 - **Hard errors:** invalid JSON, missing paths, mismatched values/types, cutoff or season mismatch, or missing required title calculation block publication of the analysis.
 - **Coverage warnings:** unread pages, missing comparison profiles or incomplete match ranges allow analysis of available evidence with explicit boundaries, not complete totals or definitive selection claims.
@@ -244,7 +245,9 @@ The program resolves `rows[0].goals` from tool call zero and compares both value
 
 **Matching `facts` does not certify every sentence in `analysis`.** The validator does not fully link every prose number to a reference or verify causal and tactical judgments. Comparison/title intent recognition uses limited bilingual patterns and can miss or misclassify questions.
 
-The model may correct arguments or query again after tool errors within the remaining budget. Tool errors are structured: `error_type` (`invalid_arguments`, `archive_format`, `incomplete_data`, `budget_exhausted`, …), `retryable`, and for argument problems the offending `field`, the `received` value and what was `expected` (for example the selected cutoff date, enum values or the matching club names). There is no automatic final-answer regeneration loop until validation passes, no automatic database repair, and no silent fallback to paid API access. A user-triggered retry creates new model usage.
+The model may correct arguments or query again after tool errors within the remaining budget. Tool errors are structured: `error_type` (`invalid_arguments`, `archive_format`, `incomplete_data`, `budget_exhausted`, …), `retryable`, and for argument problems the offending `field`, the `received` value and what was `expected` (for example the selected cutoff date, enum values or the matching club names).
+
+When the final answer fails only on reference, structure or JSON errors, the program makes **one tool-free repair request**: it resends the question, the same tool results, the failed draft and the precise error list, then checks the corrected answer again. It is published only if that second check passes; the first draft and errors stay in the trace. Failures that need different queries (cutoff, season, title calculation, inconsistent pagination) are not sent for repair. There is no repeated regeneration loop, no automatic database repair, and no silent fallback to paid API access. A user-triggered retry creates new model usage.
 
 ## If the answer is wrong
 
@@ -320,7 +323,7 @@ Size limits are **characters, not tokens**. Repeated history, tool definitions a
 6. **Non-additive statistics.** Overall and competition components overlap. Repeated cumulative snapshots cannot be added; differences of averages are not interval averages.
 7. **Limited semantic validation.** Facts can match while analysis overstates causation or superiority. Intent patterns and evidence coverage checks are not comprehensive.
 8. **Hard validation can still block replies.** The `partial_report` helper exists but is not automatically invoked by the new job path; not every failure yields a partial narrative. Retrieved tool evidence remains inspectable.
-9. **No automatic repair loop.** No repeated final-answer rewriting, automatic database correction or automatic reimport; retries are explicit.
+9. **Single repair attempt.** A failed answer gets at most one tool-free repair request; there is no repeated rewriting, automatic database correction or automatic reimport. Further retries are explicit.
 10. **Local service architecture.** No public deployment, multi-user access control, production task queue or automatic resume after process failure. Refresh is safe; service termination interrupts work.
 11. **Limited non-football routing.** Some real-world weather questions receive a local missing-source explanation. This is not a general intent classifier, live weather service or web-search agent.
 12. **Bounded memory.** Saving all messages is not the same as sending all history to the model. Spaces do not automatically exchange complete conversations.

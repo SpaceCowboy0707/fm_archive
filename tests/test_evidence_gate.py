@@ -79,6 +79,18 @@ class EvidenceTests(unittest.TestCase):
         doc=json.loads(self.doc());doc['facts'].append(dict(query=0,path=['next_offset'],value=None))
         self.assertTrue(validate_answer(json.dumps(doc),[q],'2036-03-04')['passed'])
 
+    def test_every_mismatch_is_reported_with_location_hint(self):
+        q=self.query();q['result']['rows']=[{'row_index':i,'goals':g} for i,g in enumerate((4,31,9))]
+        doc=json.loads(self.doc());doc['facts']=[dict(query=0,path=['rows',2,'goals'],value=31),dict(query=0,path=['rows',0,'goals'],value=4),dict(query=0,path=['rows',3,'goals'],value=9)]
+        r=validate_answer(json.dumps(doc),[q],'2036-03-04')
+        self.assertFalse(r['passed']);self.assertTrue(r['repairable'])
+        self.assertEqual(len(r['errors']),2)
+        self.assertIn('Reference 1',r['errors'][0]);self.assertIn('cites 31, but the tool returned 9',r['errors'][0]);self.assertIn('["rows", 1, "goals"]',r['errors'][0])
+        self.assertIn('Reference 3',r['errors'][1]);self.assertIn('["rows", 2, "goals"]',r['errors'][1])
+    def test_errors_needing_new_queries_are_not_repairable(self):
+        q=self.query();q['result']['snapshot_date']='2036-04-01'
+        self.assertFalse(validate_answer(self.doc(),[q],'2036-03-04')['repairable'])
+        self.assertTrue(validate_answer('{broken',[],'2036-03-04')['repairable'])
     def test_invalid_draft_never_published(self):
         r=validate_answer("Already champions!",[],'2036-03-04',"Is the championship secure")
         self.assertFalse(r['passed']);self.assertNotIn("Already champions!",r['text'])

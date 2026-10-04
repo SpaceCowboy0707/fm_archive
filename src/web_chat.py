@@ -70,6 +70,35 @@ def submit(a):
         threading.Thread(target=run,args=(request_id,room['id'],mid,cfg,local),daemon=True).start()
         return dict(id=request_id,state='running',assistant_id=mid)
 
+REPAIR_INSTRUCTIONS="Your previous structured answer failed the evidence check. Return only the complete corrected JSON object. Fix every listed reference: query is the tool result's query_index, list positions are the record's row_index, and value is copied exactly from the tool result. If a statement cannot be supported by the tool results, remove its reference and soften or remove the statement. Do not invent values. No tools are available in this request.\n"
+
+
+def repair_answer(cfg,draft,verdict,queries,events,event,language_line):
+    """One tool-free attempt to fix a failed structured answer against the same evidence; returns (draft, verdict)."""
+    evidence=json.dumps([dict(query_index=i,name=q['name'],arguments=q['arguments'],result=q['result']) for i,q in enumerate(queries)],ensure_ascii=False,separators=(',',':'))
+    if len(evidence)>350000:
+        event(dict(kind='evidence_repair',title="Repair skipped: evidence too large to resend",details=dict(errors=verdict['errors'],evidence_characters=len(evidence))))
+        return draft,verdict
+    event(dict(kind='evidence_repair',title="Sending evidence errors back for one repair attempt",details=dict(
+        errors=verdict['errors'],previous_draft=draft,evidence_characters=len(evidence),
+        note="One tool-free model request with the same tool results. The corrected answer is checked again; it is not published unless it passes.")))
+    offset=sum(e.get('kind')=='model_request' for e in events)
+    def shifted(e):
+        d=e.get('details') or {}
+        event({**e,'details':{**d,'round':d['round']+offset,'phase':'repair'}} if 'round' in d else e)
+    inputs=[dict(role='user',content=cfg['question']),
+            dict(role='user',content='Tool results by query_index:\n'+evidence),
+            dict(role='assistant',content=draft),
+            dict(role='user',content='Evidence check errors:\n'+'\n'.join('- '+e for e in verdict['errors']))]
+    try:repaired=''.join(auth.stream_reply(cfg['account'],cfg['model'],inputs,REPAIR_INSTRUCTIONS+INSTRUCTIONS+language_line,on_event=shifted,final_text_only=True))
+    except auth.ConnectionFailure as exc:
+        event(dict(kind='error',title="Repair attempt incomplete",details=dict(message=str(exc))))
+        return draft,verdict
+    result=validate_answer(repaired,queries,cfg['snapshot']['game_date'],cfg['question'])
+    event(dict(kind='evidence_recheck',title="Evidence check after repair",details={k:v for k,v in result.items() if k!='text'}))
+    return repaired,result
+
+
 def run(jid,room,mid,cfg,local=None):
     events=[];queries=[];start=time.monotonic();raw='';state='failed';text="This response did not complete.";draft=None
     def event(e):
@@ -103,7 +132,8 @@ def run(jid,room,mid,cfg,local=None):
             if len(background)>120000:raise ValueError("Character or story background is too long. Select fewer characters and retry.")
             gated=cfg['mode']=='analysis' or cfg['require_lookup']
             instructions=store.instructions_for(cfg['mode'])+AGENT_INSTRUCTIONS+(INSTRUCTIONS if gated else '')+"\nQuoted archive context:\n"+background
-            instructions+='\nResponse language: '+('Simplified Chinese' if cfg.get('language')=='zh-CN' else 'English')+'. Keep JSON keys and evidence paths unchanged. Follow explicit user requests for another response language.'
+            language_line='\nResponse language: '+('Simplified Chinese' if cfg.get('language')=='zh-CN' else 'English')+'. Keep JSON keys and evidence paths unchanged. Follow explicit user requests for another response language.'
+            instructions+=language_line
             last_flush=0
             for delta in auth.stream_reply(cfg['account'],cfg['model'],history,instructions,tools=TOOLS,execute_tool=tool.execute,on_tool=query,on_event=event,require_lookup=cfg['require_lookup'],final_text_only=gated):
                 raw+=delta
@@ -114,6 +144,8 @@ def run(jid,room,mid,cfg,local=None):
                 draft=raw
                 verdict=validate_answer(raw,queries,cfg['snapshot']['game_date'],cfg['question'])
                 event(dict(kind='evidence_check',title="Pre-answer evidence check",details={k:v for k,v in verdict.items() if k!='text'}))
+                if not verdict['passed'] and verdict.get('repairable') and queries:
+                    draft,verdict=repair_answer(cfg,draft,verdict,queries,events,event,language_line)
                 text=translate(verdict['text'],cfg.get('language','en'));state='complete' if verdict['passed'] else 'failed'
             else:text=raw;state='complete' if raw.strip() else 'failed'
     except (auth.ConnectionFailure,ValueError) as exc:

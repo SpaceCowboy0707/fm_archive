@@ -4,7 +4,7 @@
   const PREP=new Set(['input','request_routing','memory_context','context_window']);
   const MINOR=new Set(['model_accepted','text_started']);
   const ICONS={input:'✎',request_routing:'⇢',memory_context:'❖',context_window:'✂',model_request:'↑',model_accepted:'✓',text_started:'…',model_decision:'◆',
-    tool_requested:'⚙',sqlite_read:'⛁',data_processed:'⚖',tool_result:'↩',usage:'Σ',evidence_missing:'!',evidence_check:'✔',evidence_recheck:'✔',completed:'■',error:'✖',interrupted:'✖'};
+    tool_requested:'⚙',sqlite_read:'⛁',data_processed:'⚖',tool_result:'↩',usage:'Σ',evidence_missing:'!',evidence_repair:'↺',evidence_check:'✔',evidence_recheck:'✔',completed:'■',error:'✖',interrupted:'✖'};
   const num=v=>typeof v==='number'?v.toLocaleString():esc(v??'—');
   const clip=(s,n)=>{s=String(s??'');return s.length>n?s.slice(0,n)+'…':s};
   const json=v=>{const s=typeof v==='string'?v:(JSON.stringify(v,null,2)??'');return s.length>20000?s.slice(0,20000)+'\n… truncated in display ('+s.length.toLocaleString()+' characters saved)':s};
@@ -30,6 +30,7 @@
         const error=failed?`<div class="tl-error"><b>${esc(r.error)}</b>${kv(Object.fromEntries(Object.entries(r).filter(([k])=>['error_type','field','received','expected','retryable','detail'].includes(k))))}</div>`:'';
         return {status:failed?'error':'ok',head:toolName(d)+(d.label?`<span class="tl-label">${esc(d.label)}</span>`:''),meta,body:error+'<h4>Result returned to the model</h4><pre>'+esc(json(r))+'</pre>'};}
       case 'usage':return {meta:d.reported?`in ${num(d.input_tokens)} · out ${num(d.output_tokens)} · cached ${num(d.cached_tokens)}`:'not reported',body:''};
+      case 'evidence_repair':return {status:'warn',meta:`${(d.errors||[]).length} errors sent back`+(d.evidence_characters!=null?` · ${num(d.evidence_characters)} chars of evidence`:''),body:list('Errors',d.errors)+(d.previous_draft?`<h4>Previous draft</h4><pre>${esc(json(d.previous_draft))}</pre>`:'')};
       case 'evidence_check':case 'evidence_recheck':return {status:d.passed?'ok':'error',meta:d.passed?(d.partial?`passed with ${(d.warnings||[]).length} warnings`:'passed'):`failed · ${(d.errors||[]).length} errors`,body:list('Errors',d.errors)+list('Warnings',d.warnings)+list('Verified facts',d.verified_facts)};
       case 'error':case 'interrupted':return {status:'error',meta:clip(d.message||d.error_type,110),body:''};
       case 'request_routing':return {meta:clip(d.reason,90),body:''};
@@ -57,7 +58,7 @@
       const g=e.kind==='model_request'?'r'+(e.details?.round??''):PREP.has(e.kind)&&group===null?'prep':['evidence_check','evidence_recheck','completed','error','interrupted'].includes(e.kind)?'end':group;
       if(g!==group){
         if(group!==null)out+='</section>';
-        const title=g==='prep'?'<span>Preparation</span>':g==='end'?'<span>Result</span>':`<span>Round ${esc(e.details?.round??'')}</span>`;
+        const title=g==='prep'?'<span>Preparation</span>':g==='end'?'<span>Result</span>':`<span>${e.details?.phase==='repair'?'Repair round':'Round'} ${esc(e.details?.round??'')}</span>`;
         out+=`<section class="tl-group"><h3>${title}</h3>`;group=g;
       }
       out+=item(e,i);
