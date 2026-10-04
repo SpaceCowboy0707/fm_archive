@@ -14,6 +14,35 @@ This is a personal project that runs locally on Windows. The repository contains
 
 The application is tailored to a Leicester/Premier League archive. Other clubs and export formats may require code changes.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Pipeline[Deterministic data pipeline]
+        S[FM save file] --> H[Stability + SHA-256 dedup]
+        H --> B[DB backup + verified copy]
+        B --> P[fmsave parse + reader validation]
+        P --> A[Visible-field allowlist]
+        A --> DB[(archive.sqlite3)]
+    end
+    subgraph Agent[Bounded agent loop]
+        Q[Question + snapshot scope] --> M[Model round]
+        M -->|tool call| V[Validate arguments]
+        V -->|structured error| M
+        V --> T[Fixed parameterised SQL + Python metrics]
+        T -->|function_call_output| M
+        M -->|final JSON answer| G[Evidence gate]
+        G -->|pass / warnings| R[Published answer + limitations]
+        G -->|hard failure| F[Blocked, draft and evidence kept]
+    end
+    DB --> T
+    M -.-> L[(Execution trace)]
+    T -.-> L
+    G -.-> L
+```
+
+The pipeline and the agent are separate: imports never call a model, and the agent can only read. Both stages are detailed in the sections below.
+
 ## Workspace
 
 The workspace is a single local page containing the chat, the evidence explorer and the archive pages. **Archive and data** (bottom left) opens the squad, statistics, league snapshots, transfers, stories, originals, SQL workbench and checks. **Workspace settings** selects the account, model, snapshot, season, competition, squad and character background.
