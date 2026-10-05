@@ -16,6 +16,10 @@ A local **Football Manager archive and AI analysis workspace**: import FM save f
 
 <img src="docs/images/example-answer.png" alt="Example answer: which player improved the most in the past 10 months" width="800">
 
+**Stated limits.** The model is instructed not to invent numbers and the tools only return what was imported, so when data is missing the answer says so instead of filling the gap. Here the archive had no 4 October snapshot, no historical squad-status labels and no per-player attribute history, so the answer names the earliest comparable snapshot and calls its pick "the strongest documented candidate rather than a mathematically proven winner". Cited values are checked against tool results; the prose around them is not fully verified (see [Validation and correction](#validation-and-correction)).
+
+<img src="docs/images/scope-and-limitations.png" alt="Scope and limitations section of an answer: missing snapshots and attribute history are stated, not guessed" width="800">
+
 **Execution trace.** Every answer keeps its trace: model rounds, each tool call with its arguments and SQL reads, token usage, and the final evidence check. This is the run behind the answer above: 5 model rounds, 12 tool calls, 0 failed, and the pre-answer check passed with 4 warnings (shown with the answer as stated limits). The trace shows execution, not hidden model reasoning. [Full trace of this run](docs/images/trace-full.webp).
 
 <p>
