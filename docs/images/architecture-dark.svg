@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-label="Architecture: a deterministic import pipeline writes the SQLite archive; a bounded, read-only agent loop answers questions through fixed tools and an evidence gate">
+<rect width="1280" height="760" rx="16" fill="#161B22"/>
+<text x="25" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#E6EDF3" text-anchor="start">Leicester Dynasty Archive</text>
+<text x="25" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#A3ACB6" text-anchor="start">Code imports the data. The model can only read it through fixed tools, and every number it cites is checked.</text>
+<circle cx="1205" cy="40" r="5" fill="#56C288"/>
+<text x="1214" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#A3ACB6" text-anchor="start">Check</text>
+<circle cx="1107" cy="40" r="5" fill="#B395F0"/>
+<text x="1116" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#A3ACB6" text-anchor="start">Model step</text>
+<circle cx="1016" cy="40" r="5" fill="#6CA6E8"/>
+<text x="1025" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#A3ACB6" text-anchor="start">Code only</text>
+<rect x="12" y="100" width="1256" height="188" rx="12" fill="#1C222B"/>
+<text x="25" y="123" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#E6EDF3" letter-spacing="1">DETERMINISTIC PIPELINE</text>
+<text x="221.8" y="123" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#7D8590" text-anchor="start">sync_save.py → import_save.py</text>
+<rect x="1136.6" y="110" width="122.39999999999999" height="20" rx="10" fill="#16243A"/>
+<circle cx="1148.6" cy="120" r="3.5" fill="#6CA6E8"/>
+<text x="1157.6" y="124" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#6CA6E8" text-anchor="start">No model calls</text>
+<rect x="21" y="136" width="178" height="136" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="22" y="137" width="176" height="4" rx="2" fill="#6CA6E8"/>
+<text x="35" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">FM save file</text>
+<text x="35" y="184" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#6CA6E8" text-anchor="start">*.fm</text>
+<text x="35" y="206" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Import started by user</text>
+<text x="35" y="224" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Game file never touched</text>
+<rect x="233" y="136" width="178" height="136" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="234" y="137" width="176" height="4" rx="2" fill="#6CA6E8"/>
+<text x="247" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">Stable + new?</text>
+<text x="247" y="184" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#6CA6E8" text-anchor="start">SHA-256</text>
+<text x="247" y="206" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Waits for a stable file</text>
+<text x="247" y="224" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Same save is skipped,</text>
+<text x="247" y="242" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">even if renamed</text>
+<rect x="445" y="136" width="178" height="136" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="446" y="137" width="176" height="4" rx="2" fill="#6CA6E8"/>
+<text x="459" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">Verified backup</text>
+<text x="459" y="184" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#6CA6E8" text-anchor="start">SQLite backup API</text>
+<text x="459" y="206" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Archive backed up first</text>
+<text x="459" y="224" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Save copied and verified</text>
+<rect x="657" y="136" width="178" height="136" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="658" y="137" width="176" height="4" rx="2" fill="#6CA6E8"/>
+<text x="671" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">Parse + validate</text>
+<text x="671" y="184" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#6CA6E8" text-anchor="start">fmsave</text>
+<text x="671" y="206" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Per-reader validation</text>
+<text x="671" y="224" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Snapshot + season rules</text>
+<rect x="869" y="136" width="178" height="136" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="870" y="137" width="176" height="4" rx="2" fill="#6CA6E8"/>
+<text x="883" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">Visible fields only</text>
+<text x="883" y="184" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#6CA6E8" text-anchor="start">allowlist</text>
+<text x="883" y="206" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Hidden attributes</text>
+<text x="883" y="224" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">(CA/PA) never enter</text>
+<text x="883" y="242" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">the archive</text>
+<rect x="1081" y="136" width="178" height="136" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="1082" y="137" width="176" height="4" rx="2" fill="#6CA6E8"/>
+<text x="1095" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">Archive</text>
+<text x="1095" y="184" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#6CA6E8" text-anchor="start">archive.sqlite3</text>
+<text x="1095" y="206" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Players, snapshots,</text>
+<text x="1095" y="224" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">stats, league teams</text>
+<ellipse cx="1233" cy="154" rx="9" ry="3.2" fill="none" stroke="#6CA6E8" stroke-width="1.4"/>
+<path d="M1224 154 V166 A9 3.2 0 0 0 1242 166 V154" fill="none" stroke="#6CA6E8" stroke-width="1.4"/>
+<path d="M1224 160 A9 3.2 0 0 0 1242 160" fill="none" stroke="#6CA6E8" stroke-width="1.4"/>
+<path d="M203 190 H227" stroke="#6E7681" stroke-width="1.5" fill="none"/><path d="M224 186 L230 190 L224 194" stroke="#6E7681" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M415 190 H439" stroke="#6E7681" stroke-width="1.5" fill="none"/><path d="M436 186 L442 190 L436 194" stroke="#6E7681" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M627 190 H651" stroke="#6E7681" stroke-width="1.5" fill="none"/><path d="M648 186 L654 190 L648 194" stroke="#6E7681" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M839 190 H863" stroke="#6E7681" stroke-width="1.5" fill="none"/><path d="M860 186 L866 190 L860 194" stroke="#6E7681" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1051 190 H1075" stroke="#6E7681" stroke-width="1.5" fill="none"/><path d="M1072 186 L1078 190 L1072 194" stroke="#6E7681" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="12" y="334" width="1256" height="250" rx="12" fill="#1C222B"/>
+<text x="25" y="357" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#E6EDF3" letter-spacing="1">BOUNDED AGENT LOOP</text>
+<text x="188.20000000000002" y="357" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#7D8590" text-anchor="start">chat_tools.py · evidence_gate.py</text>
+<rect x="1169.6" y="344" width="89.4" height="20" rx="10" fill="#251D3A"/>
+<circle cx="1181.6" cy="354" r="3.5" fill="#B395F0"/>
+<text x="1190.6" y="358" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#B395F0" text-anchor="start">Read-only</text>
+<rect x="21" y="370" width="178" height="130" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="22" y="371" width="176" height="4" rx="2" fill="#6CA6E8"/>
+<text x="35" y="398" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">Question</text>
+<text x="35" y="418" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#6CA6E8" text-anchor="start">snapshot + season</text>
+<text x="35" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Scope set by the user</text>
+<text x="35" y="458" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Saved before any call</text>
+<rect x="233" y="370" width="178" height="130" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="234" y="371" width="176" height="4" rx="2" fill="#B395F0"/>
+<text x="247" y="398" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">Model round</text>
+<text x="247" y="418" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#B395F0" text-anchor="start">up to 7 rounds</text>
+<text x="247" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Picks a tool and its</text>
+<text x="247" y="458" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">JSON arguments</text>
+<text x="247" y="476" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Never writes SQL</text>
+<rect x="445" y="370" width="178" height="130" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="446" y="371" width="176" height="4" rx="2" fill="#6CA6E8"/>
+<text x="459" y="398" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">Validate call</text>
+<text x="459" y="418" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#6CA6E8" text-anchor="start">types, enums, dates</text>
+<text x="459" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Bad call returns a</text>
+<text x="459" y="458" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">structured error</text>
+<rect x="657" y="370" width="178" height="130" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="658" y="371" width="176" height="4" rx="2" fill="#6CA6E8"/>
+<text x="671" y="398" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">11 read-only tools</text>
+<text x="671" y="418" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#6CA6E8" text-anchor="start">fixed SQL + Python</text>
+<text x="671" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Parameterised queries</text>
+<text x="671" y="458" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Per 90, ranks, percentiles</text>
+<text x="671" y="476" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Up to 12 calls</text>
+<rect x="869" y="370" width="178" height="130" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="870" y="371" width="176" height="4" rx="2" fill="#56C288"/>
+<text x="883" y="398" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">Evidence gate</text>
+<text x="883" y="418" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#56C288" text-anchor="start">evidence_gate.py</text>
+<text x="883" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">Every cited value and</text>
+<text x="883" y="458" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">type is checked against</text>
+<text x="883" y="476" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#A3ACB6" text-anchor="start">the tool results</text>
+<rect x="1081" y="370" width="178" height="130" rx="10" fill="#0D1117" stroke="#30363D"/>
+<rect x="1082" y="371" width="176" height="4" rx="2" fill="#56C288"/>
+<text x="1095" y="398" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#E6EDF3" text-anchor="start">Answer</text>
+<rect x="1095" y="412" width="150" height="22" rx="6" fill="#16291F"/>
+<circle cx="1106" cy="423" r="3.5" fill="#56C288"/>
+<text x="1115" y="427" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#56C288" text-anchor="start">Pass</text>
+<text x="1237" y="427" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#A3ACB6" text-anchor="end">published</text>
+<rect x="1095" y="439" width="150" height="22" rx="6" fill="#2A2212"/>
+<circle cx="1106" cy="450" r="3.5" fill="#E0A64A"/>
+<text x="1115" y="454" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#E0A64A" text-anchor="start">Warnings</text>
+<text x="1237" y="454" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#A3ACB6" text-anchor="end">limits stated</text>
+<rect x="1095" y="466" width="150" height="22" rx="6" fill="#2E1A1A"/>
+<circle cx="1106" cy="477" r="3.5" fill="#F07167"/>
+<text x="1115" y="481" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#F07167" text-anchor="start">Hard fail</text>
+<text x="1237" y="481" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#A3ACB6" text-anchor="end">blocked</text>
+<path d="M203 424 H227" stroke="#6E7681" stroke-width="1.5" fill="none"/><path d="M224 420 L230 424 L224 428" stroke="#6E7681" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M415 424 H439" stroke="#6E7681" stroke-width="1.5" fill="none"/><path d="M436 420 L442 424 L436 428" stroke="#6E7681" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M627 424 H651" stroke="#6E7681" stroke-width="1.5" fill="none"/><path d="M648 420 L654 424 L648 428" stroke="#6E7681" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M839 424 H863" stroke="#6E7681" stroke-width="1.5" fill="none"/><path d="M860 420 L866 424 L860 428" stroke="#6E7681" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1051 424 H1075" stroke="#6E7681" stroke-width="1.5" fill="none"/><path d="M1072 420 L1078 424 L1072 428" stroke="#6E7681" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1170.0 272 V311.0 H746.0 V367" stroke="#6CA6E8" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+<path d="M742.0 362 L746.0 368 L750.0 362" stroke="#6CA6E8" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="896.0" y="302.0" width="124.0" height="18" rx="9" fill="#161B22"/>
+<text x="958.0" y="315.0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#6CA6E8" text-anchor="middle">read-only connection</text>
+<path d="M746.0 500 V522 H334.0 V503" stroke="#B395F0" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+<path d="M330.0 508 L334.0 502 L338.0 508" stroke="#B395F0" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="403.75" y="513" width="272.5" height="18" rx="9" fill="#1C222B"/>
+<text x="540.0" y="526" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#B395F0" text-anchor="middle">tool results go back; the model may query again</text>
+<path d="M958.0 500 V554 H310.0 V503" stroke="#56C288" stroke-width="1.5" stroke-dasharray="5 4" fill="none" stroke-linejoin="round"/>
+<path d="M306.0 508 L310.0 502 L314.0 508" stroke="#56C288" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="467.5" y="545" width="333.0" height="18" rx="9" fill="#1C222B"/>
+<text x="634.0" y="558" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#56C288" text-anchor="middle">reference errors: one tool-free repair, then checked again</text>
+<text x="25" y="616" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#E6EDF3" letter-spacing="1">GUARANTEES</text>
+<path d="M125 612 H1259" stroke="#30363D" stroke-width="1"/>
+<path d="M25.0 642 l3 3 l6 -7" stroke="#56C288" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="40.0" y="646" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#A3ACB6" text-anchor="start">Imports never call a model</text>
+<path d="M437.6666666666667 642 l3 3 l6 -7" stroke="#56C288" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="452.6666666666667" y="646" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#A3ACB6" text-anchor="start">The model never writes SQL or touches the database</text>
+<path d="M850.3333333333334 642 l3 3 l6 -7" stroke="#56C288" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="865.3333333333334" y="646" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#A3ACB6" text-anchor="start">Every cited number is checked before publishing</text>
+<path d="M25.0 666 l3 3 l6 -7" stroke="#56C288" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="40.0" y="670" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#A3ACB6" text-anchor="start">A missing value stays null, never zero</text>
+<path d="M437.6666666666667 666 l3 3 l6 -7" stroke="#56C288" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="452.6666666666667" y="670" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#A3ACB6" text-anchor="start">Hidden attributes never reach the archive</text>
+<path d="M850.3333333333334 666 l3 3 l6 -7" stroke="#56C288" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="865.3333333333334" y="670" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#A3ACB6" text-anchor="start">Charts read their values from tool results only</text>
+<rect x="12" y="690" width="1256" height="54" rx="12" fill="#0D1117" stroke="#30363D"/>
+<text x="25" y="713" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#E6EDF3" letter-spacing="1">FULL EXECUTION TRACE</text>
+<text x="25" y="732" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#A3ACB6" text-anchor="start">Every answer keeps its trace: model rounds, each tool call with its arguments, the SQL it ran, token usage and the evidence check.</text>
+</svg>

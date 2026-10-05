@@ -79,31 +79,10 @@ The application is tailored to a Leicester/Premier League archive. Other clubs a
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Pipeline[Deterministic data pipeline]
-        S[FM save file] --> H[Stability + SHA-256 dedup]
-        H --> B[DB backup + verified copy]
-        B --> P[fmsave parse + reader validation]
-        P --> A[Visible-field allowlist]
-        A --> DB[(archive.sqlite3)]
-    end
-    subgraph Agent[Bounded agent loop]
-        Q[Question + snapshot scope] --> M[Model round]
-        M -->|tool call| V[Validate arguments]
-        V -->|structured error| M
-        V --> T[Fixed parameterised SQL + Python metrics]
-        T -->|function_call_output| M
-        M -->|final JSON answer| G[Evidence gate]
-        G -.->|reference errors, one repair| M
-        G -->|pass / warnings| R[Published answer + limitations]
-        G -->|hard failure| F[Blocked, draft and evidence kept]
-    end
-    DB --> T
-    M -.-> L[(Execution trace)]
-    T -.-> L
-    G -.-> L
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
+  <img src="docs/images/architecture-light.svg" alt="Architecture: a deterministic import pipeline writes the SQLite archive; a bounded, read-only agent loop answers through 11 fixed tools, and an evidence gate checks every cited value before an answer is published" width="100%">
+</picture>
 
 The pipeline and the agent are separate: imports never call a model, and the agent can only read. Both stages are detailed in the sections below.
 
