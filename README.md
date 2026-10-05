@@ -41,6 +41,17 @@ Every answer keeps its trace: model rounds, each tool call with its arguments an
 
 </details>
 
+<details>
+<summary><b>Data layer:</b> SQL workbench and import checks</summary>
+
+The archive can be inspected without the model. The **Database workbench** lists every table and view with its schema and runs a single read-only `SELECT`/`WITH` statement (at most 500 rows and about three seconds, with CSV export). **Data checks** shows the `fmsave` version, the FM build and the per-reader validation of each imported snapshot.
+
+<img src="docs/images/database-workbench.webp" alt="Database workbench: schema browser, example queries and a read-only SQL editor" width="800">
+
+<img src="docs/images/data-checks.webp" alt="Data checks: fmsave version, FM build and per-reader validation of a snapshot" width="800">
+
+</details>
+
 **What to look at**
 - Tool design and validation: [`src/chat_tools.py`](src/chat_tools.py), [`src/evidence_gate.py`](src/evidence_gate.py)
 - Bounded tool loop and persistence: [`src/chat_auth.py`](src/chat_auth.py), [`src/web_chat.py`](src/web_chat.py)
