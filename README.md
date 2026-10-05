@@ -125,7 +125,7 @@ This is a **manually triggered import pipeline**, not a scheduled watcher. Impor
 - Clubs are tracked by UID. Promoted teams join; relegated tracked teams remain archived but are excluded from that season's Premier League comparisons.
 - On season rollover, the last valid imported snapshot of the previous season is frozen. Later backfills do not automatically replace a frozen selection.
 - Frozen does not mean complete. Without an end-of-season save, the frozen record is partial. Thirty-eight league games do not prove all cups have finished.
-- FM keeps no Premier League table between seasons. When last season's 380 fixtures are all played and the next 380 are scheduled but unstarted, the league stage is recorded as an off-season skip instead of a failure; the club snapshot still imports. Any other missing or ambiguous table remains an error.
+- FM keeps no Premier League table between seasons. When last season's 380 fixtures are all played and the next 380 are scheduled but unstarted, the league stage is recorded as an off-season skip instead of a failure; the club snapshot still imports. This includes saves where fmsave's strict count of double round-robin divisions fails only because most leagues have already reset. Any other missing or ambiguous table remains an error.
 
 ### Storage
 
@@ -209,6 +209,7 @@ Defined in [`src/chat_tools.py`](src/chat_tools.py). Account, chat creation and 
 | `player_timeline` | `player_id`, `start_date`, `end_date`, `section`, `offset` | Cumulative snapshots or retained matches; match coverage can be incomplete |
 | `injury_history` | `player_id`, date range, `offset` | Occurrences and available expected returns; not proof of current absence |
 | `transfer_history` | `player_name`, date range, `offset` | Managed-club movements inferred from consecutive snapshots (window, exact date where recorded, other club where known), with fees only from matched screenshots; not other clubs' transfers |
+| `club_squad` | `group`, `detail`, `offset` | The managed club's squad from the latest club snapshot at the cutoff: positions, squad status, contract, loan state and youth slot, optionally visible attributes; use for current depth, unlike `league_team_data` rosters that stop between seasons |
 | `league_team_data` | `season`, `club_name`, `section`, `kind`, `offset` | Team directory, roster or player statistics; no league-wide contracts/injuries |
 | `squad_attack_comparison` | `season`, `club_name`, `min_minutes` | League attack totals, per90, natural-position ranks and percentiles; no overall ability score |
 | `title_race_status` | `season`, `club_name` | Strict maximum-points sufficient condition using 20 clubs; no tie-break or probability model |

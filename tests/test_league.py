@@ -92,6 +92,14 @@ class LeagueTests(unittest.TestCase):
         unfinished=old[:-1]+[NS(**{**vars(old[-1]),'played':False})]
         self.assertIsNone(la.offseason(comps,unfinished+new,date(2036,7,6)))
 
+    def test_only_the_division_count_gate_is_tolerated(self):
+        gate=lambda name,passed:NS(name=name,passed=passed)
+        error=lambda *gates:NS(checks=(NS(reader='league_tables',gates=gates),))
+        self.assertTrue(la.only_division_gate(error(gate('double_round_robin_divisions',False),gate('table_blocks_minimum',True))))
+        self.assertFalse(la.only_division_gate(error(gate('double_round_robin_divisions',False),gate('table_blocks_minimum',False))))
+        self.assertFalse(la.only_division_gate(error(gate('table_groups_resolved',False))))
+        self.assertFalse(la.only_division_gate(NS(checks=(NS(reader='fixtures',gates=(gate('double_round_robin_divisions',False),)),))))
+
     def test_offseason_skip_counts_as_done(self):
         save=Path(self.tmp.name)/'save.fm';save.write_bytes(b'save')
         digest=la.file_hash(save)

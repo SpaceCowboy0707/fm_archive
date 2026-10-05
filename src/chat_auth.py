@@ -305,7 +305,7 @@ def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on
             if len(serialized)>40000:
                 result=dict(query_index=query_index,error=f"The result is too large ({len(serialized)} characters, limit 40000). Narrow the scope or request another page.",error_type='result_too_large',retryable=True)
                 serialized=json.dumps(result,ensure_ascii=False)
-            if name in ('story_memory','squad_attack_comparison','season_statistics','player_timeline','injury_history','transfer_history','league_team_data','player_profile','title_race_status') and not result.get('error'):
+            if name in ('story_memory','squad_attack_comparison','season_statistics','player_timeline','injury_history','transfer_history','club_squad','league_team_data','player_profile','title_race_status') and not result.get('error'):
                 evidence_ready=True
             if on_tool:on_tool({'name':name,'arguments':arguments,'result':result})
             emit('tool_result',"Query result ready to return to the model",call_id=call['call_id'],name=name,result=result,round=round_index+1,query_index=query_index,

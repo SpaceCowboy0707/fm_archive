@@ -114,6 +114,27 @@ class ToolTests(unittest.TestCase):
         self.assertNotIn('DO_NOT_SEND',json.dumps(r))
         self.assertEqual(self.tools.execute('transfer_history',dict(player_name=None,start_date='2035-09-01',end_date='2036-02-11',offset=0))['total'],0)
 
+    def test_club_squad_reads_the_latest_club_snapshot(self):
+        con=sqlite3.connect(self.db)
+        data=json.loads(con.execute("SELECT payload_json FROM analytics_snapshots WHERE sha256='2'").fetchone()[0])
+        from src.analytics import FINANCE_FIELDS, PLAYER_FIELDS
+        from src.safe_export import ATTRIBUTES
+        def record(name,slot,status,membership='registered',on_loan=False,club='Leicester'):
+            player={**dict.fromkeys(PLAYER_FIELDS),**dict(identity_key=name,name=name,age=24,natural_positions=['DC'],squad_status=status,team_slot=slot,contract_end='2039-06-30',
+                    on_loan=on_loan,loan_parent_club_name='Parent' if on_loan else None,club_name=club,attributes={**dict.fromkeys(ATTRIBUTES,10),'tackling':15})}
+            return {**dict.fromkeys(FINANCE_FIELDS),**dict(player=player,membership=membership,loan_end='2037-01-04' if membership=='loan_out' else None,wage_weekly=1)}
+        data['players']=[record('Rotation',0,'squad_player'),record('Star',0,'star_player'),record('Loanee',0,'regular_starter',on_loan=True),
+                         record('Kid',1,'youngster'),record('Away',0,'impact_sub','loan_out',club='Loan club')]
+        con.execute("UPDATE analytics_snapshots SET payload_json=? WHERE sha256='2'",(json.dumps(data),));con.commit();con.close()
+        first=self.tools.execute('club_squad',dict(group='first_team',detail='summary',offset=0))
+        self.assertEqual([r['name'] for r in first['rows']],['Star','Loanee','Rotation'])
+        self.assertEqual((first['as_of'],first['counts']),('2036-02-11',dict(first_team=3,youth=1,loaned_out=1)))
+        self.assertEqual(first['rows'][1]['loan_in_from'],'Parent');self.assertNotIn('attributes',first['rows'][0])
+        away=self.tools.execute('club_squad',dict(group='loaned_out',detail='attributes',offset=0))['rows'][0]
+        self.assertEqual((away['loaned_to'],away['loan_end'],away['attributes']['tackling']),('Loan club','2037-01-04',15))
+        self.assertNotIn('wage_weekly',json.dumps(away))
+        self.assertEqual(self.tools.execute('club_squad',dict(group='all',detail='summary',offset=0))['total'],5)
+
     def test_rows_carry_their_position_for_evidence_paths(self):
         rows=self.tools.execute('find_players',dict(query='Page',offset=0))['rows']
         self.assertEqual([r['row_index'] for r in rows],list(range(len(rows))))

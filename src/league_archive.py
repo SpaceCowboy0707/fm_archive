@@ -187,6 +187,13 @@ def store(payload,db=DB):
     return True
 
 
+def only_division_gate(exc):
+    """Late in the off-season most leagues have reset, so fmsave's strict count of double round-robin
+    divisions falls below its floor. That alone is expected then; any other failed check is not."""
+    failed=[(c.reader,g.name) for c in exc.checks for g in c.gates if not g.passed]
+    return bool(failed) and all(f==('league_tables','double_round_robin_divisions') for f in failed)
+
+
 def record_offseason(path,digest,day,gap,db=DB):
     if file_hash(path)!=digest:raise ValueError('Save changed during export')
     initialize(db)
@@ -211,11 +218,17 @@ def export_snapshot(path,db=DB):
         if not save.info.known_build:raise ValueError('Unknown save build')
         day=save.info.game_date
         comps={c.id:c.database_id for c in save.competitions()}
-        tables=[t for t in save.league_tables() if comps.get(t.competition_id)==COMPETITION_DB_ID
+        try:
+            found=save.league_tables();rejected=None
+        except fmsave.GateCheckError as exc:
+            if not only_division_gate(exc):raise
+            found=[];rejected=exc
+        tables=[t for t in found if comps.get(t.competition_id)==COMPETITION_DB_ID
                 and t.club_count==20 and all(r.team_slot==0 and r.rounds_per_venue==19 for r in t.rows)]
         if not tables:
             gap=offseason(comps,save.fixtures(),day)
             if gap:return record_offseason(path,digest,day,gap,db)
+        if rejected:raise ValueError(str(rejected))
         if len(tables)!=1:raise ValueError("Could not uniquely identify the 20-club Premier League table. Nothing was written.")
         table=tables[0]
         if len({r.club_uid for r in table.rows})!=20 or any(r.club_uid is None for r in table.rows):raise ValueError('Club membership unavailable')
