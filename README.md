@@ -16,6 +16,10 @@ A local **Football Manager archive and AI analysis workspace**: import FM save f
 
 <img src="docs/images/example-answer.png" alt="Example answer: which player improved the most in the past 10 months" width="800">
 
+**Charts.** Answers can include bar, line, scatter and pie charts. The model only names the query, the records and the fields to plot; the program reads every plotted value from the tool result, and a spec that does not resolve is dropped. The footer of the chart below shows its source query and snapshot date.
+
+<img src="docs/images/example-chart.png" alt="Scatter plot of Leicester goals against xG for 2035/36 with a y = x reference line" width="800">
+
 **Stated limits.** The model is instructed not to invent numbers and the tools only return what was imported, so when data is missing the answer says so instead of filling the gap. Here the archive had no 4 October snapshot, no historical squad-status labels and no per-player attribute history, so the answer names the earliest comparable snapshot and calls its pick "the strongest documented candidate rather than a mathematically proven winner". Cited values are checked against tool results; the prose around them is not fully verified (see [Validation and correction](#validation-and-correction)).
 
 <img src="docs/images/scope-and-limitations.png" alt="Scope and limitations section of an answer: missing snapshots and attribute history are stated, not guessed" width="800">
