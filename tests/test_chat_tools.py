@@ -104,6 +104,16 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(typo['expected'],['Louis Page'])
         self.assertIn('Latin script',self.tools.execute('transfer_history',dict(player_name='佩奇',start_date='2035-07-01',end_date='2036-02-11',offset=0))['error'])
 
+    def test_transfer_history_merges_screenshots_without_leaking_fields(self):
+        con=sqlite3.connect(self.db)
+        event=dict(player_name='Louis Page',direction='out',kind='loan',date='2035-08-01',other_club='Loan club',fee_display='Loan',fee_eur_displayed=None,note='',secret='DO_NOT_SEND')
+        con.execute('INSERT INTO transfer_events VALUES(?,?,?)',(1,'2035-08-01',json.dumps(event)));con.commit();con.close()
+        r=self.tools.execute('transfer_history',dict(player_name='page',start_date='2035-07-01',end_date='2036-02-11',offset=0))
+        self.assertEqual(r['total'],1);row=r['rows'][0]
+        self.assertEqual((row['movement'],row['source'],row['club'],row['date']),('loaned_out','screenshot','Loan club','2035-08-01'))
+        self.assertNotIn('DO_NOT_SEND',json.dumps(r))
+        self.assertEqual(self.tools.execute('transfer_history',dict(player_name=None,start_date='2035-09-01',end_date='2036-02-11',offset=0))['total'],0)
+
     def test_rows_carry_their_position_for_evidence_paths(self):
         rows=self.tools.execute('find_players',dict(query='Page',offset=0))['rows']
         self.assertEqual([r['row_index'] for r in rows],list(range(len(rows))))

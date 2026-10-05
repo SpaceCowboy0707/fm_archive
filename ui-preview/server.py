@@ -59,7 +59,7 @@ class Handler(BaseHTTPRequestHandler):
                 body=path.read_bytes();self.send_response(200);self.send_header('Content-Type','image/png');self.send_header('Cache-Control','max-age=86400');self.send_header('X-Content-Type-Options','nosniff');self.end_headers();self.wfile.write(body);return
             elif u.path=='/locales/zh-CN.json':
                 data=json.loads((ROOT/'locales/zh-CN.json').read_text(encoding='utf-8'))
-            elif u.path in ('/','/index.html','/style.css','/app.js','/live.js','/i18n.js','/archive.js','/archive.css','/timeline.js'):
+            elif u.path in ('/','/index.html','/style.css','/app.js','/live.js','/i18n.js','/archive.js','/archive.css','/timeline.js','/charts.js'):
                 path=ROOT/'ui-preview'/('index.html' if u.path=='/' else u.path[1:]);body=path.read_bytes()
                 self.send_response(200);self.send_header('Content-Type',{'html':'text/html','css':'text/css','js':'application/javascript'}[path.suffix[1:]]+'; charset=utf-8');self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(body);return
             else:self.send_error(404);return
@@ -68,7 +68,11 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:self.reply(dict(error='Local data is unavailable. Check service logs.'),500)
     def do_POST(self):
         global LOGIN
-        if not self.allowed() or self.headers.get('Origin') not in ('http://127.0.0.1:8502','http://localhost:8502') or not secrets.compare_digest(self.headers.get('X-Workspace-Token',''),TOKEN):self.send_error(403);return
+        if not self.allowed() or self.headers.get('Origin') not in ('http://127.0.0.1:8502','http://localhost:8502'):
+            self.reply(dict(error='Request blocked: it did not come from the local workspace page.'),403);return
+        # A restart issues a new token; the page refetches it and retries once (nothing was processed).
+        if not secrets.compare_digest(self.headers.get('X-Workspace-Token',''),TOKEN):
+            self.reply(dict(error='The workspace service restarted. Refresh the page and try again.',code='stale_token'),403);return
         try:
             length=int(self.headers.get('Content-Length','0'))
             if not 0<length<=100000:raise ValueError('Invalid request length.')
@@ -98,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path=='/api/collect':
                 sid=int(a.get('snapshot_id',0));ids=a.get('people',[])
                 data=dict(id=store.collect(a.get('message_id',''),a.get('title',''),a.get('season',''),[p for p in squad(sid) if p['identity_key'] in ids]))
-            else:self.send_error(404);return
+            else:self.reply(dict(error='Unknown workspace action.'),404);return
             self.reply(data)
         except (ValueError,sqlite3.Error,auth.ConnectionFailure) as exc:self.reply(dict(error=str(exc)),400)
         except Exception:self.reply(dict(error='Local processing failed. No automatic retry occurred; check execution records.'),500)

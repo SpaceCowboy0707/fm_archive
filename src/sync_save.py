@@ -36,8 +36,8 @@ def sync():
             with sqlite3.connect(DB) as con:
                 core=con.execute('SELECT id,game_date FROM snapshots WHERE sha256=?',(digest,)).fetchone()
                 extended=con.execute('SELECT 1 FROM analytics_snapshots WHERE sha256=?',(digest,)).fetchone()
-                from src.league_archive import has_snapshot
-                if core and extended and has_snapshot(digest):
+                from src.league_archive import stage_done,offseason_skip
+                if core and extended and stage_done(digest):
                     print(f'Already up to date: snapshot {core[0]}, game date {core[1]}; no duplicate import.',flush=True)
                     return
                 backup=ROOT/'db/backups'/('before-sync-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3')
@@ -50,8 +50,10 @@ def sync():
                 row=con.execute('SELECT game_date,sha256 FROM snapshots WHERE id=?',(sid,)).fetchone()
                 if not con.execute('SELECT 1 FROM analytics_snapshots WHERE sha256=?',(row[1],)).fetchone():
                     raise ValueError("Core snapshot imported but extended statistics are incomplete. Please retry.")
-            if not has_snapshot(row[1]):raise ValueError("Premier League snapshot incomplete. Retry; existing snapshots were preserved.")
+            if not stage_done(row[1]):raise ValueError("Premier League snapshot incomplete. Retry; existing snapshots were preserved.")
             print(f'Update complete: snapshot {sid}, game date {row[0]}; now {len(snapshots())} snapshots.',flush=True)
+            gap=offseason_skip(row[1])
+            if gap:print(f"Premier League stage skipped: {gap['finished_season']} is finished and {gap['next_season']} starts on {gap['next_start']}; FM keeps no league table in between.",flush=True)
         finally:
             lock.seek(0);msvcrt.locking(lock.fileno(),msvcrt.LK_UNLCK,1)
 

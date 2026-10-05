@@ -46,7 +46,7 @@ TOOLS=[
          section={'type':'string','enum':['snapshots','matches']},offset=OFFSET),
     tool('injury_history',"Read historical injuries in a date range and the latest expected return records. Names may be missing. Historical injuries do not establish current absence.",
          player_id=PLAYER,**DATES,offset=OFFSET),
-    tool('transfer_history',"Read screenshot-verified transfer events by date. Only imported screenshots are covered.",
+    tool('transfer_history',"Read the managed club's player movements in a date range: signings, departures, youth intake, loans in and out, loan returns and loanees signed permanently. Movements are inferred from consecutive archived snapshots, with the window between them and an exact date when the save records one; displayed fees come only from imported transfer screenshots matched by player, direction and date. Screenshot events outside snapshot coverage are included too. Other clubs' transfers are not covered.",
          player_name=string("Player name fragment; null means all",True),**DATES,offset=OFFSET),
 ]
 LABELS={'squad_attack_comparison':"Whole-squad attack benchmarks",'title_race_status':"Check title-race points",'player_profile':"Read player attributes and competition splits",'league_team_data':"Read league team snapshots",'archive_coverage':"Check archive coverage",'find_players':"Find players",'season_statistics':"Read season statistics",
@@ -222,7 +222,7 @@ class ArchiveTools:
                         'season_statistics':"Filter by player, season, competition and club; select latest observations, weight ratings by valid appearances, compute per90 and success rates, then paginate.",
                         'player_timeline':"Filter by stable identity and date range. snapshots retains cumulative observations; matches deduplicates retained match details, then paginates.",
                         'injury_history':"Deduplicate and filter injury occurrences by identity, date, club and type. Expected returns use only the latest snapshot, not older estimates. Paginate historical records.",
-                        'transfer_history':"Read events by date, filter by name, project permitted screenshot transfer fields and paginate."}
+                        'transfer_history':"Compare consecutive snapshots of the managed club to infer movements and their windows, take exact dates from join, contract and loan fields when they fall inside the window, attach fees from screenshots with the same player, direction and kind, keep unmatched screenshot events, filter by date range and name, then paginate."}
                     self.on_event({'kind':'data_processed','title':"Processing query data",'details':{
                         'tool':name,'filters':a,'rules':steps[name],
                         'status':'error' if result.get('error') else 'completed',
@@ -300,10 +300,14 @@ class ArchiveTools:
             return self._page(rows,offset,"Names may be duplicated. Use identity_key for subsequent queries; try a surname or another spelling when no results are returned.")
         if name=='transfer_history':
             if a['player_name'] is not None and CJK.search(a['player_name']):raise unmatched_player(a['player_name'],[])
-            rows=[json.loads(r[0]) for r in self._read(con,'SELECT payload_json FROM transfer_events WHERE date>=? AND date<=? ORDER BY date,id',(a['start_date'],a['end_date']))]
-            rows=[project(r,('player_name','date','season','direction','other_club','fee_display','fee_eur_displayed','kind','note')) for r in rows
-                  if a['player_name'] is None or normalized(a['player_name']) in normalized(r['player_name'])]
-            return self._page(rows,offset,"Source: user screenshots, limited to imported visible records. Transfer seasons start June 1; unknown loan fees are not zero.")
+            from src.movements import infer, attach_screenshots, in_range, partly_in_range, FIELDS
+            events=[json.loads(r[0]) for r in self._read(con,'SELECT payload_json FROM transfer_events WHERE date<=? ORDER BY date,id',(self.cutoff,))]
+            moves=[r for r in attach_screenshots(infer(self._data(con)),events)
+                   if a['player_name'] is None or normalized(a['player_name']) in normalized(r['player_name'])]
+            rows=[project(r,FIELDS) for r in moves if in_range(r,a['start_date'],a['end_date'])]
+            uncertain=sum(partly_in_range(r,a['start_date'],a['end_date']) for r in moves)
+            return self._page(rows,offset,"Managed-club movements only. source=snapshots rows are inferred from two consecutive archived snapshots: the move happened after window_start and on or before window_end; date is exact only when date_basis names the save field it came from. Rows are certainly inside the requested range; undated movements whose window only partly overlaps it are counted in movements_possibly_in_range and returned only if the range is widened to cover their window. club is the save's other club where known. Fees exist only where a screenshot matched (source=snapshots+screenshot) or for screenshot-only rows (source=screenshot); a missing fee is unknown, not zero. Long gaps between snapshots can hide intermediate moves. Transfer seasons start June 1.",
+                              movements_possibly_in_range=uncertain)
         if name=='player_profile':
             from src.safe_export import ATTRIBUTES
             from src.analytics import SEASON_FIELDS, season_rows

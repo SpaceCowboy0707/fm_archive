@@ -4,7 +4,7 @@ import math
 import re
 from src.i18n import INPUT_ALIASES
 
-INSTRUCTIONS="Evidence validation is enabled. After querying, the final answer must be one JSON object without code fences: {\"season\":\"2035/36\",\"comparison_player_ids\":[],\"facts\":[{\"query\":0,\"path\":[\"rows\",0,\"goals\"],\"value\":10}],\"analysis\":\"Complete user-facing Markdown answer and limitations\"}. query is the query_index field printed in that tool result, path locates a scalar field in the result, and value must match exactly in value and type. Every record in a returned list carries its own row_index: use it as the list position in path (for example [\"rows\",<row_index>,\"goals\"]) and never count positions yourself. Copy values exactly as returned, without rounding. To show that no records were returned, a path may end at an empty list or object and cite [] or {}. At most 600 fact references. analysis should answer the original question naturally with useful numerical tables, comparisons and conditional recommendations, not just a qualitative summary. Reference important raw numbers in facts; explain derived calculations. Do not invent numbers or claim that all interpretation is program-verified. Start with a concise judgment, select relevant metrics, explain their meaning, then describe actual limitations. Similar minutes do not equal similar opponents, competitions or roles; more defensive events do not alone imply greater ability. For player comparisons, include both real identities and query each player_profile and season player_timeline(matches), completing relevant pages. season is the season being analyzed. Title-race questions must call title_race_status; the program publishes the mathematical condition, so analysis must not independently announce a clinch. Missing data still requires this structure. If all relevant queries fail or are empty, facts may be empty; explain attempted scope, actual errors, absent fields and unavailable conclusions. An unread unrelated page does not invalidate all available evidence. Analyze complete data without asserting totals for incomplete scopes. Missing profiles or opponents permit descriptions, not definitive replacement recommendations. Follow the requested response language for analysis; JSON keys and reference paths remain unchanged."
+INSTRUCTIONS="Evidence validation is enabled. After querying, the final answer must be one JSON object without code fences: {\"season\":\"2035/36\",\"comparison_player_ids\":[],\"facts\":[{\"query\":0,\"path\":[\"rows\",0,\"goals\"],\"value\":10}],\"analysis\":\"Complete user-facing Markdown answer and limitations\"}. query is the query_index field printed in that tool result, path locates a scalar field in the result, and value must match exactly in value and type. Every record in a returned list carries its own row_index: use it as the list position in path (for example [\"rows\",<row_index>,\"goals\"]) and never count positions yourself. Copy values exactly as returned, without rounding. To show that no records were returned, a path may end at an empty list or object and cite [] or {}. At most 600 fact references. analysis should answer the original question naturally with useful numerical tables, comparisons and conditional recommendations, not just a qualitative summary. Reference important raw numbers in facts; explain derived calculations. Do not invent numbers or claim that all interpretation is program-verified. Start with a concise judgment, select relevant metrics, explain their meaning, then describe actual limitations. Similar minutes do not equal similar opponents, competitions or roles; more defensive events do not alone imply greater ability. For player comparisons, include both real identities and query each player_profile and season player_timeline(matches), completing relevant pages. season is the season being analyzed. Title-race questions must call title_race_status; the program publishes the mathematical condition, so analysis must not independently announce a clinch. Missing data still requires this structure. If all relevant queries fail or are empty, facts may be empty; explain attempted scope, actual errors, absent fields and unavailable conclusions. An unread unrelated page does not invalidate all available evidence. Analyze complete data without asserting totals for incomplete scopes. Missing profiles or opponents permit descriptions, not definitive replacement recommendations. Follow the requested response language for analysis; JSON keys and reference paths remain unchanged. Optionally add \"charts\", a list of at most 6 chart specs, when a chart shows the answer better than a table or when the user asks for one: {\"type\":\"bar|hbar|line|scatter|pie\",\"title\":\"...\",\"query\":<query_index>,\"records\":[\"rows\"],\"label\":\"player_name\",\"x\":\"expected_goals\",\"y\":[\"goals\"],\"sort\":\"desc|asc|none\",\"limit\":15,\"diagonal\":true}. query may also be a list of query_index values for the pages of one lookup, whose records are joined; records is the path to a list of records in that tool result; label names each bar, slice or point; x is required for scatter (numeric) and line (date, season or number); y is a list of numeric fields, one per series (scatter and pie take exactly one; bar, hbar and line up to three). Fields are names or short paths such as [\"totals\",2], which follows that result's metric_columns. Never write chart values yourself: the program reads every plotted value from the tool result, and a spec that does not resolve is dropped with its reason. Use hbar for long player names, pie only for parts of one whole (at most 8 slices; the rest fold into Other), diagonal for a y=x reference such as goals against xG. Place a chart inside analysis by writing [[chart:N]] on its own line (N counts from 1); charts not placed appear after the analysis."
 
 
 def championship(rows,club_uid):
@@ -92,7 +92,8 @@ def validate_answer(raw,queries,cutoff,question="",notes=()):
     errors=[];facts=[];warnings=list(notes)
     try:
         doc=json.loads(strip_fence(raw))
-        if not isinstance(doc,dict) or set(doc)!={'season','comparison_player_ids','facts','analysis'}:raise ValueError("Answer structure does not match the validation schema")
+        required={'season','comparison_player_ids','facts','analysis'}
+        if not isinstance(doc,dict) or not required<=set(doc) or not set(doc)<=required|{'charts'}:raise ValueError("Answer structure does not match the validation schema")
         if not isinstance(doc['season'],str) or not isinstance(doc['analysis'],str) or not isinstance(doc['facts'],list) or len(doc['facts'])>600:raise ValueError("Invalid answer fields")
         if not re.fullmatch(r'\d{4}/\d{2}',doc['season']):raise ValueError("Invalid season format")
         ids=doc['comparison_player_ids']
@@ -169,12 +170,40 @@ def validate_answer(raw,queries,cutoff,question="",notes=()):
             conclusions.append(str(q['result'].get('club_name',"Target club"))+' · '+str(q['result'].get('as_of',''))+': '+("The strict maximum-points condition is satisfied: mathematically clinched." if q['result']['mathematically_clinched'] else "The strict maximum-points condition does not establish a clinch. This does not prove that the title is still undecided under every tie-break scenario."))
     text=''
     if conclusions:text+="\n\n**Programmatic conclusion**\n\n"+'\n'.join(conclusions)
+    charts,chart_notes=draw_charts(doc.get('charts'),queries)
     if not title_question:
-        text+='\n\n'+doc['analysis']
+        text+='\n\n'+place_charts(doc['analysis'],charts)
+        if chart_notes:text+='\n\n'+'\n'.join('- '+n for n in chart_notes)
     else:text+="\n\nOnly the program-verifiable points condition is published here, not title probabilities or unverified title claims."
     warnings=list(dict.fromkeys(warnings))
     if warnings:text+="\n\n**Missing information and conclusion boundaries**\n\n"+'\n'.join('- '+w for w in warnings)
-    return dict(passed=True,partial=bool(warnings),errors=[],warnings=warnings,verified_facts=facts,text=text.strip())
+    return dict(passed=True,partial=bool(warnings),errors=[],warnings=warnings,verified_facts=facts,
+                charts=[c['title'] for c in charts.values()],chart_notes=chart_notes,text=text.strip())
+
+
+def draw_charts(specs,queries):
+    """Resolve chart specs against the tool results; a bad spec is dropped with its reason, never blocking the answer."""
+    from src.charts import resolve, MAX_CHARTS
+    charts,notes={},[]
+    if specs is None:return charts,notes
+    if not isinstance(specs,list):return charts,["Charts were omitted: charts must be a list."]
+    for n,spec in enumerate(specs,1):
+        if n>MAX_CHARTS:notes.append(f"Chart {n} was omitted: at most {MAX_CHARTS} charts per answer.");continue
+        try:charts[n]=resolve(spec,queries)
+        except ValueError as exc:notes.append(f"Chart {n} was omitted: {exc}.")
+    return charts,notes
+
+
+def place_charts(analysis,charts):
+    """Put each chart where the analysis writes [[chart:N]]; charts not placed follow the analysis."""
+    block=lambda n:'\n\n```chart\n'+json.dumps(charts[n],ensure_ascii=False)+'\n```\n\n'
+    placed=set()
+    def swap(match):
+        n=int(match.group(1))
+        if n not in charts or n in placed:return ''
+        placed.add(n);return block(n)
+    text=re.sub(r'\[\[chart:(\d+)\]\]',swap,analysis)
+    return text+''.join(block(n) for n in charts if n not in placed)
 
 
 def partial_report(queries):

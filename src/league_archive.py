@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS league_team_snapshots(
 CREATE TABLE IF NOT EXISTS league_frozen_seasons(
  season TEXT PRIMARY KEY,source_sha256 TEXT NOT NULL,as_of TEXT NOT NULL,
  league_complete INTEGER NOT NULL,frozen_at TEXT NOT NULL,note TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS league_offseason_skips(
+ sha256 TEXT PRIMARY KEY,game_date TEXT NOT NULL,finished_season TEXT NOT NULL,
+ next_season TEXT NOT NULL,next_start TEXT NOT NULL,note TEXT NOT NULL);
 CREATE VIEW IF NOT EXISTS v_league_team_current AS
  SELECT t.*,s.game_date,s.season,s.league_complete FROM league_team_snapshots t
  JOIN league_snapshots s ON s.sha256=t.sha256
@@ -73,6 +76,18 @@ def has_snapshot(digest,db=DB):
         return bool(exists and con.execute('SELECT 1 FROM league_snapshots WHERE sha256=?',(digest,)).fetchone())
 
 
+def offseason_skip(digest,db=DB):
+    with closing(connection(db)) as con:
+        exists=con.execute("SELECT 1 FROM sqlite_master WHERE name='league_offseason_skips'").fetchone()
+        row=exists and con.execute('SELECT * FROM league_offseason_skips WHERE sha256=?',(digest,)).fetchone()
+        return dict(row) if row else None
+
+
+def stage_done(digest,db=DB):
+    """A save is finished for the league stage when it was stored or recorded as an off-season skip."""
+    return has_snapshot(digest,db) or offseason_skip(digest,db) is not None
+
+
 def squad_projection(p):
     return dict(uid=p.uid,name=p.name,birth_date=iso(p.birth_date),age=p.age,height_cm=p.height_cm,
                 natural_positions=list(p.natural_positions),attributes={k:getattr(p.attributes,k) for k in ATTRIBUTES})
@@ -95,6 +110,24 @@ def infer_season(table,fixtures,day):
         raise ValueError("The Premier League season could not be uniquely reconciled using the 380 fixtures and table appearances. Nothing was written.")
     year=candidates[0]
     return f'{year}/{str(year+1)[-2:]}'
+
+
+def offseason(comps,fixtures,day):
+    """FM drops the Premier League table between seasons. Recognise only the clear case: last season's
+    380 fixtures are all played and the next 380 are scheduled but none has started."""
+    ids={cid for cid,db_id in comps.items() if db_id==COMPETITION_DB_ID}
+    groups=defaultdict(dict)
+    for f in fixtures:
+        if f.competition_id in ids and f.season_start_year is not None:
+            groups[f.season_start_year][(f.home_team_id,f.away_team_id)]=f
+    if not groups:return None
+    year=max(groups)
+    upcoming,finished=groups[year].values(),groups.get(year-1,{}).values()
+    if len(upcoming)!=380 or len(finished)!=380:return None
+    if any(f.played or not f.date or f.date<=day for f in upcoming):return None
+    if not all(f.played and f.date and f.date<=day for f in finished):return None
+    return dict(finished_season=f'{year-1}/{str(year)[-2:]}',next_season=f'{year}/{str(year+1)[-2:]}',
+                next_start=iso(min(f.date for f in upcoming)))
 
 
 def detect_reset(previous,teams):
@@ -154,10 +187,23 @@ def store(payload,db=DB):
     return True
 
 
+def record_offseason(path,digest,day,gap,db=DB):
+    if file_hash(path)!=digest:raise ValueError('Save changed during export')
+    initialize(db)
+    note="FM keeps no Premier League table between seasons. Earlier league snapshots are unchanged; the stage resumes when the new season's table exists."
+    with closing(connection(db)) as con,con:
+        con.execute('INSERT OR IGNORE INTO league_offseason_skips VALUES(?,?,?,?,?,?)',(digest,iso(day),gap['finished_season'],gap['next_season'],gap['next_start'],note))
+    summary=dict(status='offseason_skipped',date=iso(day),**gap)
+    print(json.dumps(summary,ensure_ascii=False),flush=True)
+    return summary
+
+
 def export_snapshot(path,db=DB):
     import fmsave
     digest=file_hash(path)
     if has_snapshot(digest,db):return {'status':'already_imported','sha256':digest}
+    skipped=offseason_skip(digest,db)
+    if skipped:return {**skipped,'status':'offseason_skipped'}
     print("Checking Premier League snapshot: "+path.name,flush=True)
     with closing(connection(db)) as con:
         tracked={r[0] for r in con.execute('SELECT club_uid FROM league_teams')} if con.execute("SELECT 1 FROM sqlite_master WHERE name='league_teams'").fetchone() else set()
@@ -167,6 +213,9 @@ def export_snapshot(path,db=DB):
         comps={c.id:c.database_id for c in save.competitions()}
         tables=[t for t in save.league_tables() if comps.get(t.competition_id)==COMPETITION_DB_ID
                 and t.club_count==20 and all(r.team_slot==0 and r.rounds_per_venue==19 for r in t.rows)]
+        if not tables:
+            gap=offseason(comps,save.fixtures(),day)
+            if gap:return record_offseason(path,digest,day,gap,db)
         if len(tables)!=1:raise ValueError("Could not uniquely identify the 20-club Premier League table. Nothing was written.")
         table=tables[0]
         if len({r.club_uid for r in table.rows})!=20 or any(r.club_uid is None for r in table.rows):raise ValueError('Club membership unavailable')

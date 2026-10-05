@@ -60,6 +60,7 @@ Services bind to loopback only; this is not a public deployment. Closing a brows
 - Historical snapshots and continuously tracked Premier League team rosters and season statistics.
 - Whole-squad attacking comparisons: totals, per-90 metrics, natural-position ranks and percentiles.
 - Natural-language questions with bounded, read-only tool calling and optional follow-up queries.
+- Bar, horizontal bar, line, scatter and pie charts inside answers, with every plotted value read from tool results.
 - Inspectable tool arguments, actual SQL, returned evidence and reported token usage.
 - A schema browser and restricted manual SQL workbench with CSV exports.
 - Original conversation preservation and sourced canon / inference / headcanon stories.
@@ -73,7 +74,7 @@ Use **Archive and data** at the bottom of the conversation sidebar. Pages open i
 | Current squad | `#archive/squad` | Snapshot, squad, position and name filters; player cards, visible attributes, seasons, matches, injury/contract records, stories and snapshot history |
 | Season and competition statistics | `#archive/statistics` | Single/combined seasons, competition and club scope; detailed columns, per-90 values, fixtures, retained match totals, finances, injuries and coverage |
 | Premier League snapshots | `#archive/league` | Independent season selection, frozen/latest status, standings, club statistics, rosters, attributes and coverage |
-| Transfer archive | `#archive/transfers` | Season/direction/name filters, displayed fees, source references and original screenshots |
+| Transfer archive | `#archive/transfers` | Screenshot events with season/direction/name filters, displayed fees and original screenshots; squad movements inferred from snapshots with movement/source/name filters |
 | Story archive | `#archive/stories` | Evidence level, character and text filters; sourced stories and JSON export |
 | Conversation originals | `#archive/originals` | Original passages, speaker/character/text search and lossless source backup |
 | Database workbench | `#archive/database` | Clickable schema list, SQL definitions, examples, read-only editor and CSV results |
@@ -124,6 +125,7 @@ This is a **manually triggered import pipeline**, not a scheduled watcher. Impor
 - Clubs are tracked by UID. Promoted teams join; relegated tracked teams remain archived but are excluded from that season's Premier League comparisons.
 - On season rollover, the last valid imported snapshot of the previous season is frozen. Later backfills do not automatically replace a frozen selection.
 - Frozen does not mean complete. Without an end-of-season save, the frozen record is partial. Thirty-eight league games do not prove all cups have finished.
+- FM keeps no Premier League table between seasons. When last season's 380 fixtures are all played and the next 380 are scheduled but unstarted, the league stage is recorded as an off-season skip instead of a failure; the club snapshot still imports. Any other missing or ambiguous table remains an error.
 
 ### Storage
 
@@ -206,12 +208,14 @@ Defined in [`src/chat_tools.py`](src/chat_tools.py). Account, chat creation and 
 | `player_profile` | `player_id`, `season` | Visible attributes at the cutoff and season competition splits |
 | `player_timeline` | `player_id`, `start_date`, `end_date`, `section`, `offset` | Cumulative snapshots or retained matches; match coverage can be incomplete |
 | `injury_history` | `player_id`, date range, `offset` | Occurrences and available expected returns; not proof of current absence |
-| `transfer_history` | `player_name`, date range, `offset` | Screenshot-verified events, not complete game transfer history |
+| `transfer_history` | `player_name`, date range, `offset` | Managed-club movements inferred from consecutive snapshots (window, exact date where recorded, other club where known), with fees only from matched screenshots; not other clubs' transfers |
 | `league_team_data` | `season`, `club_name`, `section`, `kind`, `offset` | Team directory, roster or player statistics; no league-wide contracts/injuries |
 | `squad_attack_comparison` | `season`, `club_name`, `min_minutes` | League attack totals, per90, natural-position ranks and percentiles; no overall ability score |
 | `title_race_status` | `season`, `club_name` | Strict maximum-points sufficient condition using 20 clubs; no tie-break or probability model |
 
 Names are bilingual in practice: club names come from the save in Chinese, player names are in Latin script, and questions mix both. Club arguments match stored names, the aliases in [`locales/club-aliases.json`](locales/club-aliases.json) (English full and short names, common Chinese short names) or a club uid, ignoring case, accents and suffixes such as FC. A club argument that matches nothing (or, where one club is required, more than one) returns an error listing that season's clubs with their English names and uids. A player search with no match returns close spellings, or a transliteration hint when the query is not in Latin script.
+
+The save has no transfer history: it only shows each player's current club, join date, loans and agreed future contracts. `src/movements.py` therefore compares consecutive snapshots of the managed club and classifies each change as joined, youth intake, loan in, signed permanently, left, left while on loan, loan ended, loaned out or loan returned. A movement is known to have happened inside its window (after the earlier snapshot, on or before the later one); an exact date is used only when a join, contract or loan date falls inside that window. Fees are attached only from a screenshot with the same player, direction and kind (the nearest one within seven days of an exact date). A date-range query returns movements that certainly fall inside the range and counts undated ones whose window only partly overlaps it. Departures name a destination only from an agreed contract, which may have been a loan.
 
 Use `identity_key` returned by player search, not an invented ID. Dates are game dates bounded by the selected snapshot. Use returned `next_offset` for pagination.
 
@@ -240,6 +244,8 @@ A structured answer has this form (illustrative values, not a real player):
 ```
 
 The program resolves `rows[0].goals` from tool call zero and compares both value and type. Every tool result carries its `query_index`, and every record in a returned list carries its `row_index`, so references copy positions instead of counting them; long result lists made counting errors common. Every reference is checked, and each failure names the reference, query, path, cited value and returned value, plus where the cited value actually appears when it is found elsewhere in the same list. `null` may be referenced as missing, never changed into zero. A null `next_offset` means no next page, not a missing metric.
+
+An answer may also include up to six `charts` (bar, hbar, line, scatter, pie). A chart spec names a query (or the pages of one lookup), the list of records in its result and the fields to plot, for example `{"type": "scatter", "query": [0, 1], "records": ["rows"], "label": "player_name", "x": "expected_goals", "y": ["goals"], "diagonal": true}`. The model never writes chart values: [`src/charts.py`](src/charts.py) reads every plotted value from the tool result, skips records without values, sorts and limits points, and folds pie slices beyond eight into Other. A spec that does not resolve is dropped with its reason and never blocks the answer. [`ui-preview/charts.js`](ui-preview/charts.js) draws the charts as inline SVG with hover values, a legend for several series and a data table.
 
 - **Hard errors:** invalid JSON, missing paths, mismatched values/types, cutoff or season mismatch, or missing required title calculation block publication of the analysis.
 - **Coverage warnings:** unread pages, missing comparison profiles or incomplete match ranges allow analysis of available evidence with explicit boundaries, not complete totals or definitive selection claims.
@@ -320,7 +326,7 @@ Size limits are **characters, not tokens**. Repeated history, tool definitions a
 1. **Incomplete world/history coverage.** Only imported saves, supported club/league exports and manual evidence are available. Missing saves cannot be reconstructed.
 2. **Parser uncertainty.** Some match fields, competition names and base-currency semantics need in-game checks. Injury names have known gaps; occurrence and expected-return dates do not establish actual days missed.
 3. **Uneven league coverage.** League expansion excludes contracts, injuries and complete individual history. Leicester-specific coverage does not imply equivalent coverage for every club.
-4. **Incomplete spatial/event data.** Retained matches are not necessarily all matches. There is no complete coordinate source for real pitch heatmaps, nor a model tool to freely generate and persist arbitrary dashboards.
+4. **Incomplete spatial/event data.** Retained matches are not necessarily all matches. There is no complete coordinate source for real pitch heatmaps; answer charts are limited to five chart types over returned records, not free-form dashboards.
 5. **Descriptive benchmarks.** Natural positions differ from actual roles, DM/MC share a group and multi-position players enter multiple groups. Rankings do not adjust for opponents, possession, tactics or match state. Higher shots/offsides are not necessarily better.
 6. **Non-additive statistics.** Overall and competition components overlap. Repeated cumulative snapshots cannot be added; differences of averages are not interval averages.
 7. **Limited semantic validation.** Facts can match while analysis overstates causation or superiority. Intent patterns and evidence coverage checks are not comprehensive.

@@ -801,6 +801,7 @@
   "Returned {0} rows · {1} ms": "返回 {0} 行 · {1} ms",
   "Query incomplete: {0}. Only read-only queries are permitted. Reduce the scope and retry.": "查询未完成：{0}。仅允许只读查询；可缩小范围后重试。",
   "Update complete: snapshot {0}, game date {1}; now {2} snapshots.": "更新完成：快照 {0}，游戏日期 {1}，现有 {2} 个快照。",
+  "Premier League stage skipped: {0} is finished and {1} starts on {2}; FM keeps no league table in between.": "英超步骤已跳过：{0} 赛季已结束，{1} 赛季将于 {2} 开始；两季之间 FM 存档中没有英超积分榜。",
   "Already up to date: snapshot {0}, game date {1}; no duplicate import.": "已是最新：快照 {0}，游戏日期 {1}；未重复导入。",
   "Unknown fees: {0} events": "费用未知 {0} 笔",
   "The local archive is temporarily unavailable": "本地档案暂时不可读",
@@ -1316,5 +1317,15 @@
   "Repair skipped: evidence too large to resend": "证据过大，跳过修正",
   "Evidence check after repair": "修正后的证据检查",
   "Repair attempt incomplete": "修正请求未完成",
-  "Repair output was unusable": "修正结果无法使用"
+  "Repair output was unusable": "修正结果无法使用",
+  "Squad movements inferred from snapshots": "根据快照推断的球员变动",
+  "Each move happened between two archived snapshots (window). An exact date appears only when the save records one; fees appear only where an imported screenshot matched. Long gaps between snapshots can hide moves.": "每次变动都发生在两个存档快照之间（时间范围）。只有存档里记录了日期时才显示精确日期；只有匹配到导入的截图时才显示转会费。快照间隔过长时，中间的变动可能被遗漏。",
+  "Movement": "变动类型",
+  "Snapshots only": "仅快照推断",
+  "Snapshots and screenshot": "快照 + 截图",
+  "Screenshot only": "仅截图",
+  "Search moving player": "搜索变动球员",
+  "The workspace service restarted. Refresh the page and try again.": "工作台服务已重启，请刷新页面后重试。",
+  "Request blocked: it did not come from the local workspace page.": "请求被拦截：它不是来自本地工作台页面。",
+  "Unknown workspace action.": "未知的工作台操作。"
 }

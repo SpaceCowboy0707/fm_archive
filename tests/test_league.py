@@ -80,4 +80,26 @@ class LeagueTests(unittest.TestCase):
         self.assertEqual(tools.execute('league_team_data',{**args,'club_name':'3'})['rows'][0]['club_name'],'Club 3')
         self.assertEqual(tools.execute('league_team_data',{**args,'season':'2030/31'})['field'],'season')
 
+    def test_offseason_gap_is_recognised_only_when_clear(self):
+        pairs=[(a,b) for a in range(20) for b in range(20) if a!=b]
+        old=[NS(competition_id=7,season_start_year=2035,home_team_id=a,away_team_id=b,played=True,date=date(2036,5,1)) for a,b in pairs]
+        new=[NS(competition_id=7,season_start_year=2036,home_team_id=a,away_team_id=b,played=False,date=date(2036,8,15+i%3)) for i,(a,b) in enumerate(pairs)]
+        comps={7:11,9:67}
+        self.assertEqual(la.offseason(comps,old+new,date(2036,7,6)),dict(finished_season='2035/36',next_season='2036/37',next_start='2036-08-15'))
+        self.assertIsNone(la.offseason(comps,old+new,date(2036,8,15)))
+        self.assertIsNone(la.offseason(comps,old[:-1]+new,date(2036,7,6)))
+        self.assertIsNone(la.offseason({7:67},old+new,date(2036,7,6)))
+        unfinished=old[:-1]+[NS(**{**vars(old[-1]),'played':False})]
+        self.assertIsNone(la.offseason(comps,unfinished+new,date(2036,7,6)))
+
+    def test_offseason_skip_counts_as_done(self):
+        save=Path(self.tmp.name)/'save.fm';save.write_bytes(b'save')
+        digest=la.file_hash(save)
+        self.assertFalse(la.stage_done(digest,self.db))
+        gap=dict(finished_season='2035/36',next_season='2036/37',next_start='2036-08-15')
+        self.assertEqual(la.record_offseason(save,digest,date(2036,7,6),gap,self.db)['status'],'offseason_skipped')
+        self.assertTrue(la.stage_done(digest,self.db));self.assertFalse(la.has_snapshot(digest,self.db))
+        self.assertEqual(la.export_snapshot(save,self.db)['next_start'],'2036-08-15')
+        self.assertEqual(la.read_teams(db=self.db),[])
+
 if __name__=='__main__':unittest.main()

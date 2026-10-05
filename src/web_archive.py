@@ -17,6 +17,7 @@ from src.league_archive import connection, read_teams
 from src.lore import load_lore
 from src.safe_export import ROOT
 from src.transfers import read_transfers
+from src.movements import read_movements
 
 
 @lru_cache(maxsize=2)
@@ -54,7 +55,7 @@ def overview(page, snapshot_id=None, period=None, identity=None):
     if page == 'transfers':
         rows, batches = read_transfers()
         images = {k: {'url': '/api/archive/image?id=' + k} for b in batches for k in b['images']}
-        return dict(rows=rows, images=images)
+        return dict(rows=rows, images=images, movements=read_movements(DB))
     if page == 'stories':
         return dict(rows=load_lore())
     if page == 'originals':
