@@ -25,6 +25,15 @@ class EvidenceTests(unittest.TestCase):
         q=self.query();q['result']['snapshot_date']='2036-04-01';self.assertFalse(check()['passed'])
         q=self.query();q['arguments']['season']='2034/35';self.assertFalse(check()['passed'])
         q=self.query(None);self.assertTrue(validate_answer(self.doc(None),[q],'2036-03-04')['passed'])
+    def test_other_seasons_allow_declared_cross_season_answers(self):
+        q=self.query();q['arguments']['season']='2034/35'
+        r=validate_answer(self.doc(),[q],'2036-03-04')
+        self.assertFalse(r['passed']);self.assertTrue(r['repairable'])
+        self.assertIn('query 0 uses 2034/35, but the answer season is 2035/36',r['errors'][0])
+        doc=json.loads(self.doc());doc['other_seasons']=['2034/35']
+        self.assertTrue(validate_answer(json.dumps(doc),[q],'2036-03-04')['passed'])
+        doc['other_seasons']='2034/35'
+        self.assertFalse(validate_answer(json.dumps(doc),[q],'2036-03-04')['passed'])
     def test_missing_both_players_and_title_evidence(self):
         self.assertTrue(validate_answer(self.doc(),[self.query()],'2036-03-04',"Compare two goalkeepers")['partial'])
         self.assertFalse(validate_answer(self.doc(),[self.query()],'2036-03-04',"Is the championship secure")['passed'])

@@ -509,6 +509,8 @@
   "Current title-race judgment lacks standings for the selected date": "当前争冠判断缺少所选日期的积分榜",
   "Query cutoff date mismatch": "查询截止日期不匹配",
   "Query season mismatch": "查询赛季不一致",
+  "Query season mismatch: query {0} uses {1}, but the answer season is {2}. If intended, add it to other_seasons and label each figure's season in analysis": "查询赛季不一致：查询 {0} 使用 {1}，但回答的赛季是 {2}。如确需引用，请将其加入 other_seasons，并在分析中标明每个数字所属赛季",
+  "other_seasons must be a list of up to 5 seasons such as 2035/36": "other_seasons 必须是最多 5 个赛季的列表，例如 2035/36",
   "Match dates do not cover the discussion season. Only describe available data; do not make definitive superiority or starter-replacement recommendations": "比较的逐场日期范围不覆盖讨论赛季；仅能分析已查到的部分，不能作确定的双方优劣或首发替换建议",
   "Title-race question lacks the programmatic points calculation": "争冠问题缺少程序积分计算",
   "Pagination totals are inconsistent": "分页总量不一致",
