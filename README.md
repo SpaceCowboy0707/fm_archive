@@ -12,6 +12,10 @@ A local **Football Manager archive and AI analysis workspace**: import FM save f
 - **Read-only agent:** the model chooses among 11 tools and their arguments (fixed parameterised SQL plus Python metrics) and may investigate over several rounds. It never writes SQL or touches the database directly.
 - **Evidence gate:** the final answer must cite exact fields in tool results. The program checks each cited value and type, makes one repair attempt on reference errors, and blocks answers that fail hard checks.
 
+**Example.** A real answer from the Analysis space: the question, a sourced conclusion, and a table built from tool results. **View evidence** (top right) opens the tool calls, SQL and checked references behind it.
+
+<img src="docs/images/example-answer.png" alt="Example answer: which player improved the most in the past 10 months" width="800">
+
 **What to look at**
 - Tool design and validation: [`src/chat_tools.py`](src/chat_tools.py), [`src/evidence_gate.py`](src/evidence_gate.py)
 - Bounded tool loop and persistence: [`src/chat_auth.py`](src/chat_auth.py), [`src/web_chat.py`](src/web_chat.py)
