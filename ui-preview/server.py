@@ -44,6 +44,10 @@ class Handler(BaseHTTPRequestHandler):
                 day=a.get('date',['9999-12-31'])[0]
                 rows=read('archive.sqlite3',"SELECT t.standing_json,s.game_date,s.season FROM league_team_snapshots t JOIN league_snapshots s ON s.sha256=t.sha256 WHERE t.club_uid=673 AND s.game_date<=? ORDER BY s.game_date DESC LIMIT 1",(day,))
                 data=rows[0] if rows else {};data['standing']=json.loads(data.pop('standing_json','{}') or '{}')
+                # Between seasons FM has no league table; the latest table stays the season shown, with the gap noted.
+                if read('archive.sqlite3',"SELECT 1 FROM sqlite_master WHERE name='league_offseason_skips'"):
+                    gap=read('archive.sqlite3','SELECT game_date,next_season,next_start FROM league_offseason_skips WHERE game_date<=? AND game_date>? ORDER BY game_date DESC LIMIT 1',(day,data.get('game_date') or ''))
+                    data['offseason']=gap[0] if gap else None
             elif u.path=='/api/archive':
                 data=web_archive.overview(a.get('page',['squad'])[0],a.get('snapshot',[None])[0],a.get('period',[None])[0],a.get('identity',[None])[0])
             elif u.path=='/api/archive/schema':
