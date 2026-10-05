@@ -2,6 +2,8 @@
 
 A local **Football Manager archive and AI analysis workspace**: import FM save files into SQLite, browse historical snapshots, and ask an assistant questions that it answers from retrieved, checkable evidence.
 
+<img src="docs/images/workspace.webp" alt="The workspace: conversation list, the Analysis and Dressing room spaces, question history and the composer" width="900">
+
 ## Overview
 
 **Problem.** An FM save is a black box. Questions such as "how does my squad's attack compare with similar Premier League players?" need data across many saves, and an LLM left alone will invent numbers.
@@ -26,6 +28,10 @@ A local **Football Manager archive and AI analysis workspace**: import FM save f
 The model is instructed not to invent numbers and the tools only return what was imported, so when data is missing the answer says so instead of filling the gap. Here the archive had no 4 October snapshot, no historical squad-status labels and no per-player attribute history, so the answer names the earliest comparable snapshot and calls its pick "the strongest documented candidate rather than a mathematically proven winner". Cited values are checked against tool results; the prose around them is not fully verified (see [Validation and correction](#validation-and-correction)).
 
 <img src="docs/images/scope-and-limitations.png" alt="Scope and limitations section of an answer: missing snapshots and attribute history are stated, not guessed" width="800">
+
+A question outside the archive is declined rather than guessed. Real-world weather has no source here, so a keyword rule in [`src/chat_routing.py`](src/chat_routing.py) returns a fixed reply, without calling the model or any tool, that says what is missing and that no forecast will be invented. This is a narrow rule, not a general intent classifier.
+
+<img src="docs/images/out-of-scope-question.png" alt="Out-of-scope question about the weather: the answer states the missing source and invents nothing" width="600">
 
 </details>
 
