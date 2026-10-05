@@ -1,10 +1,73 @@
 # Leicester Dynasty Archive
 
-A local **Football Manager archive and AI analysis workspace**. Import game saves into SQLite, browse historical snapshots, inspect SQL, and ask an assistant to retrieve evidence, compare players and explain findings.
+A local **Football Manager archive and AI analysis workspace**: import FM save files into SQLite, browse historical snapshots, and ask an assistant questions that it answers from retrieved, checkable evidence.
+
+<img src="docs/images/workspace.webp" alt="The workspace: conversation list, the Analysis and Dressing room spaces, question history and the composer" width="900">
+
+## Overview
+
+**Problem.** An FM save is a black box. Questions such as "how does my squad's attack compare with similar Premier League players?" need data across many saves, and an LLM left alone will invent numbers.
+
+**Approach.** A bounded **agentic analytics workflow** with a hard split between code and model:
+
+- **Deterministic pipeline, no model calls:** SHA-256 dedup, verified backup, `fmsave` parsing and validation, then a visible-field allowlist into SQLite. Hidden attributes such as CA/PA never enter the archive.
+- **Read-only agent:** the model chooses among 11 tools and their arguments (fixed parameterised SQL plus Python metrics) and may investigate over several rounds. It never writes SQL or touches the database directly.
+- **Evidence gate:** the final answer must cite exact fields in tool results. The program checks each cited value and type, makes one repair attempt on reference errors, and blocks answers that fail hard checks.
+
+**Example.** A real answer from the Analysis space: the question, a sourced conclusion, and a table built from tool results. **View evidence** (top right) opens the tool calls, SQL and checked references behind it.
+
+<img src="docs/images/example-answer.png" alt="Example answer: which player improved the most in the past 10 months" width="800">
+
+**Charts.** Answers can include bar, line, scatter and pie charts. The model only names the query, the records and the fields to plot; the program reads every plotted value from the tool result, and a spec that does not resolve is dropped. The footer of the chart below shows its source query and snapshot date.
+
+<img src="docs/images/example-chart.png" alt="Scatter plot of Leicester goals against xG for 2035/36 with a y = x reference line" width="800">
+
+<details>
+<summary><b>Stated limits:</b> what the model says when data is missing</summary>
+
+The model is instructed not to invent numbers and the tools only return what was imported, so when data is missing the answer says so instead of filling the gap. Here the archive had no 4 October snapshot, no historical squad-status labels and no per-player attribute history, so the answer names the earliest comparable snapshot and calls its pick "the strongest documented candidate rather than a mathematically proven winner". Cited values are checked against tool results; the prose around them is not fully verified (see [Validation and correction](#validation-and-correction)).
+
+<img src="docs/images/scope-and-limitations.png" alt="Scope and limitations section of an answer: missing snapshots and attribute history are stated, not guessed" width="800">
+
+A question outside the archive is declined rather than guessed. Real-world weather has no source here, so a keyword rule in [`src/chat_routing.py`](src/chat_routing.py) returns a fixed reply, without calling the model or any tool, that says what is missing and that no forecast will be invented. This is a narrow rule, not a general intent classifier.
+
+<img src="docs/images/out-of-scope-question.png" alt="Out-of-scope question about the weather: the answer states the missing source and invents nothing" width="600">
+
+</details>
+
+<details>
+<summary><b>Execution trace:</b> how an answer was produced</summary>
+
+Every answer keeps its trace: model rounds, each tool call with its arguments and SQL reads, token usage, and the final evidence check. This is the run behind the first example: 5 model rounds, 12 tool calls, 0 failed, and the pre-answer check passed with 4 warnings (shown with the answer as stated limits). The trace shows execution, not hidden model reasoning. [Full trace of this run](docs/images/trace-full.webp).
+
+<p>
+  <img src="docs/images/trace-summary.png" alt="Evidence explorer summary: 5 model rounds, 12 tool calls, 0 failed calls" width="380">
+  <img src="docs/images/trace-evidence-check.png" alt="Final round and pre-answer evidence check passed with 4 warnings" width="380">
+</p>
+
+</details>
+
+<details>
+<summary><b>Data layer:</b> SQL workbench and import checks</summary>
+
+The archive can be inspected without the model. The **Database workbench** lists every table and view with its schema and runs a single read-only `SELECT`/`WITH` statement (at most 500 rows and about three seconds, with CSV export). **Data checks** shows the `fmsave` version, the FM build and the per-reader validation of each imported snapshot.
+
+<img src="docs/images/database-workbench.webp" alt="Database workbench: schema browser, example queries and a read-only SQL editor" width="800">
+
+<img src="docs/images/data-checks.webp" alt="Data checks: fmsave version, FM build and per-reader validation of a snapshot" width="800">
+
+</details>
+
+**What to look at**
+- Tool design and validation: [`src/chat_tools.py`](src/chat_tools.py), [`src/evidence_gate.py`](src/evidence_gate.py)
+- Bounded tool loop and persistence: [`src/chat_auth.py`](src/chat_auth.py), [`src/web_chat.py`](src/web_chat.py)
+- Snapshot/season rules and import pipeline: [Data pipeline](#data-pipeline-game-save--archive)
+- Full execution trace (steps, SQL, usage) for every answer: [Logs, SQL and usage](#logs-sql-and-usage)
+- Honest limits: [Budgets and known limitations](#budgets-and-known-limitations)
+
+**Stack.** Python 3.12, SQLite, `fmsave`, a stdlib HTTP server with a vanilla HTML/CSS/JS frontend (no build step), optional Streamlit pages, `unittest` (synthetic data and mocked model responses, no live model calls). Local, loopback-only, bilingual UI (English/简体中文).
 
 Two separate conversation spaces share the archive: **Analysis** for football data and **Dressing room** for stories and headcanon. Fiction is not automatically promoted to game fact, and collecting a story is an explicit user action.
-
-This is a bounded **agentic analytics workflow**: the model selects tools and arguments, receives their results, and decides whether to investigate further or answer. Importing, SQL execution, metric calculations, validation and persistence are deterministic application code. The agent cannot freely modify the database or operate the computer.
 
 > Implementation guide, updated October 3, 2026. Available data depends on imported saves. Evidence checks do not guarantee that every natural-language conclusion is correct.
 
