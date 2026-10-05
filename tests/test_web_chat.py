@@ -26,6 +26,14 @@ class WebJobTests(unittest.TestCase):
         with self.assertRaises(ValueError):web.submit({**self.args,'request_id':'another-request-00001'})
         web.init();self.assertEqual(web.jobs(self.room)[0]['state'],'interrupted')
         self.assertIn("service restarted",store.messages(self.room)[-1]['text'])
+    def test_latest_save_is_resolved_when_the_question_is_sent(self):
+        newer=[dict(id=2,game_date='2036-08-04',club_uid=673),dict(id=1,game_date='2036-04-03',club_uid=673)]
+        with patch.object(web,'snapshots',return_value=newer):
+            web.submit({**self.args,'snapshot_id':1,'follow_latest':True})
+            with store.connect() as c:c.execute("update web_jobs set state='complete'")
+            web.submit({**self.args,'request_id':'request-test-00000002','chat_id':store.create_chat('pinned',self.db,mode='analysis'),'snapshot_id':1})
+        with store.connect() as c:configs=[json.loads(r[0]) for r in c.execute('select config from web_jobs order by created')]
+        self.assertEqual([c['snapshot']['id'] for c in configs],[2,1])
     def test_worker_persists_tool_result_and_answer(self):
         r=web.submit(self.args)
         tool=MagicMock();tool._data.return_value=[]

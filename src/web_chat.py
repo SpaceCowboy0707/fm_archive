@@ -46,7 +46,9 @@ def submit(a):
         if a.get('retry'):
             question=next((m['text'] for m in reversed(hist) if m['role']=='user'),'')
         if not question or len(question)>10000:raise ValueError("Enter a question of at most 10,000 characters.")
-        snapshot=next((s for s in snapshots() if s['id']==a.get('snapshot_id')),None)
+        # "Latest save" is resolved here, so a save imported after the page loaded is still used.
+        available=snapshots()
+        snapshot=available[0] if a.get('follow_latest') and available else next((s for s in available if s['id']==a.get('snapshot_id')),None)
         if not snapshot:raise ValueError("Select a valid snapshot.")
         period=a.get('season','')
         if not re.fullmatch(r'\d{4}/\d{2}',period):raise ValueError("Use a season such as 2035/36.")
