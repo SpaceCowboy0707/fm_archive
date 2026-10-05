@@ -4,7 +4,7 @@
   const PREP=new Set(['input','request_routing','memory_context','context_window']);
   const MINOR=new Set(['model_accepted','text_started']);
   const ICONS={input:'✎',request_routing:'⇢',memory_context:'❖',context_window:'✂',model_request:'↑',model_accepted:'✓',text_started:'…',model_decision:'◆',
-    tool_requested:'⚙',sqlite_read:'⛁',data_processed:'⚖',tool_result:'↩',usage:'Σ',evidence_missing:'!',evidence_repair:'↺',evidence_check:'✔',evidence_recheck:'✔',completed:'■',error:'✖',interrupted:'✖'};
+    tool_requested:'⚙',sqlite_read:'⛁',data_processed:'⚖',tool_result:'↩',usage:'Σ',evidence_missing:'!',evidence_repair:'↺',tool_choice_relaxed:'↺',evidence_check:'✔',evidence_recheck:'✔',completed:'■',error:'✖',interrupted:'✖'};
   const num=v=>typeof v==='number'?v.toLocaleString():esc(v??'—');
   const clip=(s,n)=>{s=String(s??'');return s.length>n?s.slice(0,n)+'…':s};
   const json=v=>{const s=typeof v==='string'?v:(JSON.stringify(v,null,2)??'');return s.length>20000?s.slice(0,20000)+'\n… truncated in display ('+s.length.toLocaleString()+' characters saved)':s};
@@ -33,6 +33,7 @@
       case 'evidence_repair':return {status:'warn',meta:(d.mode==='patch'?`fix references ${(d.references||[]).join(', ')} only · `:d.mode==='rewrite'?'full rewrite · ':'')+`${(d.errors||[]).length} errors sent back`+(d.evidence_characters!=null?` · ${num(d.evidence_characters)} chars of evidence`:''),body:list('Errors',d.errors)+(d.previous_draft?`<h4>Previous draft</h4><pre>${esc(json(d.previous_draft))}</pre>`:'')};
       case 'evidence_check':case 'evidence_recheck':return {status:d.passed?'ok':'error',meta:d.passed?(d.partial?`passed with ${(d.warnings||[]).length} warnings`:'passed'):`failed · ${(d.errors||[]).length} errors`,body:list('Errors',d.errors)+list('Warnings',d.warnings)+list('Verified facts',d.verified_facts)};
       case 'error':case 'interrupted':return {status:'error',meta:clip(d.message||d.error_type,110),body:''};
+      case 'tool_choice_relaxed':return {status:'warn',meta:'service stopped text in a tool-only round · next round may query or answer',body:''};
       case 'request_routing':return {meta:clip(d.reason,90),body:''};
       default:return {meta:clip(d.name||d.reason||d.note||'',90),body:''};
     }

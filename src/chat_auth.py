@@ -197,17 +197,22 @@ def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on
     calls_used=0
     tool_index=0
     evidence_ready=False
+    # Set when the service stops a required-tool round because the model wanted to write text.
+    relaxed=False
     allowed={t['name'] for t in tools or []}
     for round_index in range(7):
         final_only=round_index==6 or calls_used>=MAX_TOOL_CALLS
         body={'model':model,'input':list(inputs),'instructions':instructions,'store':False,'stream':True}
-        choice='none' if final_only else 'required' if require_lookup and not evidence_ready else 'auto'
+        choice='none' if final_only else 'required' if require_lookup and not evidence_ready and not relaxed else 'auto'
         if tools:
             body.update(tools=tools,tool_choice=choice,parallel_tool_calls=True)
+        if relaxed and not evidence_ready and not final_only:
+            body['instructions']+="\nNo archive data query has succeeded yet. Call a data tool if one can answer; otherwise answer now, state which data the archive lacks, and do not assert unverified performance conclusions."
         if final_only and require_lookup and not evidence_ready:
             body['instructions']+="\nThe query budget is exhausted without concrete evidence. Describe attempted queries and gaps only; do not assert unverified performance conclusions."
             emit('evidence_missing',"Query budget exhausted without concrete evidence",note="Only gaps can be reported; verification has not succeeded.")
         completed=False
+        retry=False
         received_text=False
         buffered_text=[]
         output=[]
@@ -248,7 +253,16 @@ def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on
                     elif kind in ('response.failed','response.incomplete','error'):
                         from src.chat_trace import usage_details
                         emit('usage',"Usage reported for the interrupted request",round=round_index+1,**usage_details((event.get('response') or {}).get('usage')))
+                        reason=((event.get('response') or {}).get('incomplete_details') or {}).get('reason')
+                        if kind=='response.incomplete' and reason=='max_messages' and choice=='required' and not relaxed and not final_only:
+                            retry=True
+                            break
                         raise response_failure(event)
+            if retry:
+                relaxed=True
+                emit('tool_choice_relaxed',"Retrying without a forced tool call",round=round_index+1,reason='max_messages',
+                     note="The model began writing text in a round that only allowed tool calls, so the service stopped it. The next round lets the model either query or answer; unverified conclusions remain blocked by the evidence check.")
+                continue
             if not completed:raise ConnectionFailure("The connection ended without confirmation that the response completed. Please retry.")
         except (requests.RequestException,ValueError):
             raise ConnectionFailure("The chat connection was interrupted. Please retry.") from None

@@ -282,6 +282,26 @@ class AgentLoopTests(unittest.TestCase):
             self.assertEqual(''.join(auth.stream_reply('cid','model',[],'',TOOLS,lambda *a:{'rows':[]},require_lookup=True)),'Checked answer')
         self.assertEqual([b['tool_choice'] for b in bodies],['required','required','required','auto'])
 
+    def test_text_in_a_required_round_retries_once_without_forcing_tools(self):
+        class Stopped(Stream):
+            def iter_lines(self,**kwargs):
+                yield 'data: '+json.dumps(dict(type='response.output_text.delta',delta='No data yet'))
+                yield 'data: '+json.dumps(dict(type='response.incomplete',response=dict(incomplete_details=dict(reason='max_messages'))))
+        coverage=dict(type='function_call',call_id='0',name='archive_coverage',arguments='{}')
+        bodies=[];events=[]
+        replies=iter([Stream([coverage]),Stopped(),Stream(text='The archive has no 2036/37 data yet')])
+        def post(*args,**kwargs):bodies.append(kwargs['json']);return next(replies)
+        with patch.object(auth,'access_token',return_value='synthetic'),patch.object(auth.requests,'post',side_effect=post):
+            text=''.join(auth.stream_reply('cid','model',[],'',TOOLS,lambda *a:{'rows':[]},on_event=events.append,require_lookup=True,final_text_only=True))
+        self.assertEqual(text,'The archive has no 2036/37 data yet')
+        self.assertEqual([b['tool_choice'] for b in bodies],['required','required','auto'])
+        self.assertIn('No archive data query has succeeded yet',bodies[2]['instructions'])
+        self.assertIn('tool_choice_relaxed',[e['kind'] for e in events])
+        replies=iter([Stopped(),Stopped()])
+        with patch.object(auth,'access_token',return_value='synthetic'),patch.object(auth.requests,'post',side_effect=post):
+            with self.assertRaisesRegex(auth.ConnectionFailure,'max_messages'):
+                list(auth.stream_reply('cid','model',[],'',TOOLS,lambda *a:{'rows':[]},require_lookup=True,final_text_only=True))
+
     def test_light_background_has_no_bulk_statistics(self):
         data=[dict(snapshot=dict(date='2036-02-11'),season_stats=[dict(period='2035/36',goals=999999)])]
         background=store.lookup_context([],[],data,dict(game_date='2036-02-11'),'2035/36','overall','first_team')
