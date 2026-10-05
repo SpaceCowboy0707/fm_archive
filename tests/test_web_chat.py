@@ -34,6 +34,48 @@ class WebJobTests(unittest.TestCase):
             web.submit({**self.args,'request_id':'request-test-00000002','chat_id':store.create_chat('pinned',self.db,mode='analysis'),'snapshot_id':1})
         with store.connect() as c:configs=[json.loads(r[0]) for r in c.execute('select config from web_jobs order by created')]
         self.assertEqual([c['snapshot']['id'] for c in configs],[2,1])
+    def test_blank_or_following_season_uses_the_save_season(self):
+        rooms=[store.create_chat(name,self.db,mode='analysis') for name in ('a','b','c')]
+        cases=[dict(season='',follow_season=True),dict(season='2035/36',follow_season=True),dict(season='2034/35',follow_season=False)]
+        with patch.object(web,'current_season',return_value='2036/37'):
+            for n,(room,extra) in enumerate(zip(rooms,cases)):
+                web.submit({**self.args,'request_id':f'request-season-0000000{n}','chat_id':room,**extra})
+                with store.connect() as c:c.execute("update web_jobs set state='complete'")
+        with patch.object(web,'current_season',return_value=None):
+            with self.assertRaisesRegex(ValueError,'Enter a discussion season'):web.submit({**self.args,'request_id':'request-season-00000009','season':''})
+        with store.connect() as c:configs=[json.loads(r[0]) for r in c.execute('select config from web_jobs order by created')]
+        self.assertEqual([c['season'] for c in configs],['2036/37','2036/37','2034/35'])
+    def test_checked_answer_is_shown_while_written(self):
+        r=web.submit(self.args)
+        tool=MagicMock();tool._data.return_value=[]
+        self.stack.enter_context(patch.object(web,'ArchiveTools',return_value=tool))
+        self.stack.enter_context(patch.object(web,'squad',return_value=[]));self.stack.enter_context(patch.object(web,'load_lore',return_value=[]))
+        seen=[]
+        def stream(*args,**kw):
+            kw['on_tool'](dict(name='season_statistics',arguments={'season':'2035/36'},result=dict(snapshot_date='2036-04-03',rows=[{'goals':10}],total=1,offset=0,next_offset=None)))
+            answer=json.dumps(dict(season='2035/36',comparison_player_ids=[],analysis="Draft analysis",facts=[dict(query=0,path=['rows',0,'goals'],value=10)]))
+            kw['on_text'](2,answer[:answer.index('analysis')+len('analysis')+9])
+            with store.connect() as c:seen.append(c.execute('select text from messages where id=?',(r['assistant_id'],)).fetchone()[0])
+            yield answer
+        self.stack.enter_context(patch.object(web.auth,'stream_reply',side_effect=stream))
+        with store.connect() as c:cfg=json.loads(c.execute('select config from web_jobs').fetchone()[0])
+        web.run(r['id'],self.room,r['assistant_id'],cfg)
+        self.assertEqual(seen,['Draft'])
+        self.assertIn("Draft analysis",store.messages(self.room)[-1]['text'])
+    def test_delete_turn_and_chat_remove_their_records(self):
+        ids={}
+        for key,role in [('old','assistant'),('q1','user'),('a1','assistant'),('retry','assistant'),('q2','user'),('a2','assistant')]:
+            ids[key]=store.save_message(self.room,role,key,db=self.db)
+            store.save_workflow(ids[key],[dict(kind='input')],db=self.db,validation_draft='{}')
+        self.assertEqual(store.delete_turn(self.room,ids['retry'],db=self.db),3)
+        self.assertEqual([m['text'] for m in store.messages(self.room,db=self.db)],['old','q2','a2'])
+        self.assertEqual(store.delete_turn(self.room,ids['old'],db=self.db),1)
+        with self.assertRaisesRegex(ValueError,'not found'):store.delete_turn(self.room,ids['q1'],db=self.db)
+        web.submit(self.args)
+        store.delete_chat(self.room,db=self.db)
+        with store.connect(self.db) as c:
+            self.assertEqual([c.execute(f'select count(*) from {t}').fetchone()[0] for t in ('chats','messages','workflow_traces','validation_drafts','web_jobs','chat_preferences')],[0]*6)
+        with self.assertRaisesRegex(ValueError,'Chat not found'):store.delete_chat(self.room,db=self.db)
     def test_worker_persists_tool_result_and_answer(self):
         r=web.submit(self.args)
         tool=MagicMock();tool._data.return_value=[]

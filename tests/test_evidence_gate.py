@@ -34,6 +34,13 @@ class EvidenceTests(unittest.TestCase):
         self.assertTrue(validate_answer(json.dumps(doc),[q],'2036-03-04')['passed'])
         doc['other_seasons']='2034/35'
         self.assertFalse(validate_answer(json.dumps(doc),[q],'2036-03-04')['passed'])
+    def test_partial_analysis_reads_unfinished_answers(self):
+        from src.evidence_gate import partial_analysis
+        self.assertIsNone(partial_analysis('{"season":"2036/37","comparison_player_ids":[]'))
+        self.assertEqual(partial_analysis('{"season":"x","analysis":"## A\\nline \\\"q\\\" [[chart:1]] \\u4e2d'),'## A\nline "q"  \u4e2d')
+        self.assertEqual(partial_analysis('{"analysis":"cut \\'),'cut ')
+        self.assertEqual(partial_analysis('{"analysis":"cut \\u4e'),'cut ')
+        self.assertEqual(partial_analysis('{"analysis":"done","facts":[{"value":"x"}]}'),'done')
     def test_missing_both_players_and_title_evidence(self):
         self.assertTrue(validate_answer(self.doc(),[self.query()],'2036-03-04',"Compare two goalkeepers")['partial'])
         self.assertFalse(validate_answer(self.doc(),[self.query()],'2036-03-04',"Is the championship secure")['passed'])

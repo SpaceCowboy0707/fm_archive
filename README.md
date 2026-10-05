@@ -88,11 +88,11 @@ The pipeline and the agent are separate: imports never call a model, and the age
 
 ## Workspace
 
-The workspace is a single local page containing the chat, the evidence explorer and the archive pages. **Archive and data** (bottom left) opens the squad, statistics, league snapshots, transfers, stories, originals, SQL workbench and checks. **Workspace settings** selects the account, model, snapshot, season, competition, squad and character background.
+The workspace is a single local page containing the chat, the evidence explorer and the archive pages. **Archive and data** (bottom left) opens the squad, statistics, league snapshots, transfers, stories, originals, SQL workbench and checks. **Workspace settings** selects the account, model, snapshot, season, competition, squad and character background. By default the snapshot is the latest imported save and the discussion season is that save's current season, both resolved when a question is sent; choosing a date or typing a season pins it. Answers follow the language of the question.
 
 English is the default repository and interface language. The workspace remembers the browser's language preference across chat and archive pages. The optional legacy Streamlit pages have their own language selector. Changing language does not rewrite stored chats, player or club names, original documents, SQL, or evidence payloads. An explicit request for another answer language can override the default.
 
-The new frontend uses HTML/CSS/JavaScript with a Python HTTP service. All eight archive pages render natively in the workspace, without new tabs or embedded Streamlit pages. They reuse the existing databases and validation functions. Questions remain chronological and collapsed by default, with the composer at the bottom.
+The new frontend uses HTML/CSS/JavaScript with a Python HTTP service. All eight archive pages render natively in the workspace, without new tabs or embedded Streamlit pages. They reuse the existing databases and validation functions. Questions remain chronological, with the latest one expanded by default and the composer at the bottom. While an evidence-checked answer is written, its analysis text is shown as it arrives, marked as unchecked, and the verified answer replaces it when the check finishes. Conversations and single questions (with their retries and execution records) can be deleted after confirmation; collected headcanon keeps its own copy.
 
 Services bind to loopback only; this is not a public deployment. Closing a browser does not stop the service. Pinned dependencies are recorded in `uv.lock`.
 

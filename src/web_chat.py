@@ -4,8 +4,9 @@ from datetime import datetime,timezone
 from contextlib import closing
 from src import chat_store as store,chat_auth as auth
 from src.archive import snapshots,squad
+from src.league_archive import current_season
 from src.chat_tools import ArchiveTools,TOOLS,AGENT_INSTRUCTIONS,LABELS
-from src.evidence_gate import INSTRUCTIONS,validate_answer,failed_references,apply_fixes,strip_fence
+from src.evidence_gate import INSTRUCTIONS,validate_answer,failed_references,apply_fixes,strip_fence,partial_analysis
 from src.chat_routing import unsupported_request
 from src.lore import load_lore
 from src.i18n import translate
@@ -50,7 +51,11 @@ def submit(a):
         available=snapshots()
         snapshot=available[0] if a.get('follow_latest') and available else next((s for s in available if s['id']==a.get('snapshot_id')),None)
         if not snapshot:raise ValueError("Select a valid snapshot.")
-        period=a.get('season','')
+        # A blank season, or follow_season, means the selected save's current season.
+        period=(a.get('season') or '').strip()
+        if a.get('follow_season') or not period:
+            period=current_season(snapshot['game_date']) or ''
+            if not period:raise ValueError("No league season is archived for this save. Enter a discussion season such as 2035/36.")
         if not re.fullmatch(r'\d{4}/\d{2}',period):raise ValueError("Use a season such as 2035/36.")
         kind=a.get('kind','overall');scope=a.get('scope','first_team')
         if kind not in ('overall','league','cup','continental','non_competitive','international') or scope not in ('first_team','club','all'):raise ValueError("Invalid query scope.")
@@ -158,10 +163,21 @@ def run(jid,room,mid,cfg,local=None):
             if len(background)>120000:raise ValueError("Character or story background is too long. Select fewer characters and retry.")
             gated=cfg['mode']=='analysis' or cfg['require_lookup']
             instructions=store.instructions_for(cfg['mode'])+AGENT_INSTRUCTIONS+(INSTRUCTIONS if gated else '')+"\nQuoted archive context:\n"+background
-            language_line='\nResponse language: '+('Simplified Chinese' if cfg.get('language')=='zh-CN' else 'English')+'. Keep JSON keys and evidence paths unchanged. Follow explicit user requests for another response language.'
+            # Reply in the language the question was asked in; the interface language only breaks ties.
+            language_line="\nResponse language: the language of the user's latest question (a Chinese question gets Simplified Chinese, an English question English). If that is unclear, use "+('Simplified Chinese' if cfg.get('language')=='zh-CN' else 'English')+'. Keep JSON keys and evidence paths unchanged. Follow explicit user requests for another response language.'
             instructions+=language_line
             last_flush=0
-            for delta in auth.stream_reply(cfg['account'],cfg['model'],history,instructions,tools=TOOLS,execute_tool=tool.execute,on_tool=query,on_event=event,require_lookup=cfg['require_lookup'],final_text_only=gated):
+            writing=dict(round=None,raw='',flushed=0.0)
+            def show_draft(round_number,delta):
+                # The checked answer arrives as JSON; show its analysis as it is written. The final text replaces it.
+                if round_number!=writing['round']:writing.update(round=round_number,raw='')
+                writing['raw']+=delta
+                if time.monotonic()-writing['flushed']>1:
+                    shown=partial_analysis(writing['raw'])
+                    if shown:
+                        with store.connect() as c:c.execute('UPDATE messages SET text=? WHERE id=?',(shown,mid))
+                        writing['flushed']=time.monotonic()
+            for delta in auth.stream_reply(cfg['account'],cfg['model'],history,instructions,tools=TOOLS,execute_tool=tool.execute,on_tool=query,on_event=event,require_lookup=cfg['require_lookup'],final_text_only=gated,on_text=show_draft if gated else None):
                 raw+=delta
                 if not gated and time.monotonic()-last_flush>1:
                     with store.connect() as c:c.execute('UPDATE messages SET text=? WHERE id=?',(raw,mid))

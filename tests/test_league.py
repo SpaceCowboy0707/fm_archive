@@ -100,6 +100,13 @@ class LeagueTests(unittest.TestCase):
         self.assertFalse(la.only_division_gate(error(gate('table_groups_resolved',False))))
         self.assertFalse(la.only_division_gate(NS(checks=(NS(reader='fixtures',gates=(gate('double_round_robin_divisions',False),)),))))
 
+    def test_current_season_follows_the_latest_league_snapshot(self):
+        self.assertIsNone(la.current_season('2036-09-21',self.db))
+        la.store(payload('2036-06-18','2035/36',True),self.db);la.store(payload('2036-08-19','2036/37'),self.db)
+        self.assertEqual(la.current_season('2036-09-21',self.db),'2036/37')
+        self.assertEqual(la.current_season('2036-08-04',self.db),'2035/36')
+        self.assertIsNone(la.current_season('2036-01-01',self.db))
+
     def test_offseason_skip_counts_as_done(self):
         save=Path(self.tmp.name)/'save.fm';save.write_bytes(b'save')
         digest=la.file_hash(save)

@@ -51,6 +51,34 @@ def messages(chat_id,db=CHAT_DB):
         if r['id'] in workflows:r['workflow']=workflows[r['id']]
     return rows
 
+def _delete_messages(con,ids):
+    # Collected headcanon keeps its own copy of the text and stays in the story archive.
+    for table,column in (('messages','id'),('query_traces','message_id'),('workflow_traces','message_id'),('validation_drafts','message_id')):
+        con.executemany(f'DELETE FROM {table} WHERE {column}=?',[(i,) for i in ids])
+    if con.execute("SELECT 1 FROM sqlite_master WHERE name='web_jobs'").fetchone():
+        con.executemany('DELETE FROM web_jobs WHERE assistant_id=?',[(i,) for i in ids])
+
+def delete_chat(chat_id,db=CHAT_DB):
+    """Delete a conversation with all its questions, answers and execution records."""
+    with connect(db) as con:
+        if not con.execute('SELECT 1 FROM chats WHERE id=?',(chat_id,)).fetchone():raise ValueError("Chat not found.")
+        _delete_messages(con,[r[0] for r in con.execute('SELECT id FROM messages WHERE chat_id=?',(chat_id,))])
+        if con.execute("SELECT 1 FROM sqlite_master WHERE name='web_jobs'").fetchone():con.execute('DELETE FROM web_jobs WHERE chat_id=?',(chat_id,))
+        con.execute('DELETE FROM chat_preferences WHERE chat_id=?',(chat_id,))
+        con.execute('DELETE FROM chats WHERE id=?',(chat_id,))
+
+def delete_turn(chat_id,message_id,db=CHAT_DB):
+    """Delete one question and all its replies (including retries). message_id may be any message of the turn."""
+    with connect(db) as con:
+        rows=[dict(r) for r in con.execute('SELECT id,role FROM messages WHERE chat_id=? ORDER BY created,rowid',(chat_id,))]
+        index=next((i for i,r in enumerate(rows) if r['id']==message_id),None)
+        if index is None:raise ValueError("Message not found in this chat.")
+        start=next((i for i in range(index,-1,-1) if rows[i]['role']=='user'),0)
+        end=next((i for i in range(start+1,len(rows)) if rows[i]['role']=='user'),len(rows))
+        ids=[r['id'] for r in rows[start:end]]
+        _delete_messages(con,ids)
+    return len(ids)
+
 def save_queries(message_id,queries,db=CHAT_DB):
     if queries:
         with connect(db) as con:

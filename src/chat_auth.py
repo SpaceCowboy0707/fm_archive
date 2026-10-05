@@ -188,7 +188,9 @@ def response_failure(event,status=None):
     if status is not None:detail=f'HTTP {status}; '+detail
     return ConnectionFailure(explanation+" Diagnostics: "+detail+". Your message is saved; the app will not automatically switch to paid API access.",code=code)
 
-def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on_tool=None,on_event=None,require_lookup=False,final_text_only=False):
+PROGRESS_SECONDS=5
+
+def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on_tool=None,on_event=None,require_lookup=False,final_text_only=False,on_text=None):
     """Replay completed Responses items and tool outputs in bounded stateless rounds."""
     def emit(kind,title,**details):
         if on_event:on_event({'kind':kind,'title':title,'details':details})
@@ -215,6 +217,8 @@ def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on
         retry=False
         received_text=False
         buffered_text=[]
+        # Buffered (evidence-checked) answers show nothing until the check, so report writing progress.
+        written=0;last_progress=None
         output=[]
         done_items={}
         emit('model_request',"Sending a model request",round=round_index+1,model=model,
@@ -241,7 +245,16 @@ def stream_reply(cid,model,messages,instructions,tools=None,execute_tool=None,on
                         if not received_text:emit('text_started',"The model started producing response text",round=round_index+1,note="Text is being generated; this round may still contain tool requests.")
                         received_text=received_text or bool(event.get('delta','').strip())
                         buffered_text.append(event.get('delta',''))
+                        # Every round's raw text, so a caller can show a buffered answer while it is written.
+                        if on_text:on_text(round_index+1,event.get('delta',''))
                         if not final_text_only:yield event.get('delta','')
+                        else:
+                            written+=len(event.get('delta',''));now=time.monotonic()
+                            if last_progress is None:last_progress=now
+                            elif now-last_progress>=PROGRESS_SECONDS:
+                                emit('writing_progress',"Writing the answer",round=round_index+1,characters=written,
+                                     note="Characters received so far. The answer is shown after the evidence check.")
+                                last_progress=now
                     elif kind=='response.output_item.done':
                         done_items[event['output_index']]=event['item']
                     elif kind=='response.completed':

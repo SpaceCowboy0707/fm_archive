@@ -135,6 +135,13 @@ class ToolTests(unittest.TestCase):
         self.assertNotIn('wage_weekly',json.dumps(away))
         self.assertEqual(self.tools.execute('club_squad',dict(group='all',detail='summary',offset=0))['total'],5)
 
+    def test_cached_archive_loads_are_shared_and_unchanged(self):
+        events=[];tools=ArchiveTools(dict(game_date='2036-02-11',club_uid=1),self.db,events.append)
+        args=dict(player_id='p',start_date='2035-07-01',end_date='2036-02-11',section='snapshots',offset=0)
+        first=tools.execute('player_timeline',args);second=tools.execute('player_timeline',args)
+        self.assertEqual(first,second)
+        self.assertEqual(sum(e['kind']=='sqlite_read' and 'analytics_snapshots' in e['details']['sql'] for e in events),1)
+
     def test_rows_carry_their_position_for_evidence_paths(self):
         rows=self.tools.execute('find_players',dict(query='Page',offset=0))['rows']
         self.assertEqual([r['row_index'] for r in rows],list(range(len(rows))))
@@ -322,6 +329,21 @@ class AgentLoopTests(unittest.TestCase):
         with patch.object(auth,'access_token',return_value='synthetic'),patch.object(auth.requests,'post',side_effect=post):
             with self.assertRaisesRegex(auth.ConnectionFailure,'max_messages'):
                 list(auth.stream_reply('cid','model',[],'',TOOLS,lambda *a:{'rows':[]},require_lookup=True,final_text_only=True))
+
+    def test_buffered_answers_report_text_and_progress(self):
+        class Slow(Stream):
+            def iter_lines(self,**kwargs):
+                for part in ('{"analysis":"','Long ','answer"}'):
+                    yield 'data: '+json.dumps(dict(type='response.output_text.delta',delta=part))
+                yield 'data: '+json.dumps(dict(type='response.completed',response=dict(output=[])))
+        clock=iter(range(0,1000,3))
+        texts=[];events=[]
+        with patch.object(auth,'access_token',return_value='synthetic'),patch.object(auth.requests,'post',return_value=Slow()),patch.object(auth.time,'monotonic',side_effect=lambda:next(clock)):
+            text=''.join(auth.stream_reply('cid','model',[],'',final_text_only=True,on_event=events.append,on_text=lambda r,d:texts.append((r,d))))
+        self.assertEqual(text,'{"analysis":"Long answer"}')
+        self.assertEqual(texts,[(1,'{"analysis":"'),(1,'Long '),(1,'answer"}')])
+        progress=[e['details']['characters'] for e in events if e['kind']=='writing_progress']
+        self.assertTrue(progress);self.assertEqual(progress,sorted(progress))
 
     def test_light_background_has_no_bulk_statistics(self):
         data=[dict(snapshot=dict(date='2036-02-11'),season_stats=[dict(period='2035/36',goals=999999)])]

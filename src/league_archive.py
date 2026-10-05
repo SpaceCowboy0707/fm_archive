@@ -83,6 +83,16 @@ def offseason_skip(digest,db=DB):
         return dict(row) if row else None
 
 
+def current_season(day,db=DB):
+    """Season of the latest league snapshot on or before day. Between seasons this stays on the
+    finished season, which has the data; None when no league snapshot exists."""
+    if not Path(db).exists():return None
+    with closing(connection(db)) as con:
+        if not con.execute("SELECT 1 FROM sqlite_master WHERE name='league_snapshots'").fetchone():return None
+        row=con.execute('SELECT season FROM league_snapshots WHERE game_date<=? ORDER BY game_date DESC,sha256 DESC LIMIT 1',(day,)).fetchone()
+        return row['season'] if row else None
+
+
 def stage_done(digest,db=DB):
     """A save is finished for the league stage when it was stored or recorded as an off-season skip."""
     return has_snapshot(digest,db) or offseason_skip(digest,db) is not None

@@ -7,6 +7,7 @@ ROOT=Path(__file__).resolve().parent.parent
 sys.path.insert(0,str(ROOT))
 from src import chat_store as store,chat_auth as auth,web_chat
 from src.archive import snapshots,squad
+from src.league_archive import current_season
 from src import web_archive, sql_console
 TOKEN=secrets.token_urlsafe(32)
 LOGIN=None
@@ -40,6 +41,10 @@ class Handler(BaseHTTPRequestHandler):
                 for key,table in [('workflow','workflow_traces'),('queries','query_traces')]:
                     rows=read('chats.sqlite3',f'SELECT payload FROM {table} WHERE message_id=?',(mid,))
                     data[key]=json.loads(rows[0]['payload']) if rows else []
+            elif u.path=='/api/draft':
+                # The answer text written so far, polled while a job runs.
+                rows=read('chats.sqlite3',"SELECT text,status FROM messages WHERE id=? AND role='assistant'",(a.get('message',[''])[0],))
+                data=rows[0] if rows else {}
             elif u.path=='/api/overview':
                 day=a.get('date',['9999-12-31'])[0]
                 rows=read('archive.sqlite3',"SELECT t.standing_json,s.game_date,s.season FROM league_team_snapshots t JOIN league_snapshots s ON s.sha256=t.sha256 WHERE t.club_uid=673 AND s.game_date<=? ORDER BY s.game_date DESC LIMIT 1",(day,))
@@ -88,6 +93,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(sql,str) or len(sql)>20000:raise ValueError('SQL exceeds the editor limit.')
                 data=sql_console.query(sql)
             elif self.path=='/api/archive/sync':data=web_archive.start_sync()
+            elif self.path in ('/api/delete-chat','/api/delete-turn'):
+                chat=str(a.get('chat_id',''))
+                if any(j['state']=='running' for j in web_chat.jobs(chat)):raise ValueError('Wait for the running answer in this conversation to finish before deleting.')
+                if self.path=='/api/delete-chat':store.delete_chat(chat);data=dict(deleted=True)
+                else:data=dict(deleted=store.delete_turn(chat,str(a.get('message_id',''))))
             elif self.path=='/api/create':
                 if a.get('mode') not in ('analysis','story'):raise ValueError('Invalid chat space.')
                 data=dict(id=store.create_chat(str(a.get('title',''))[:120],mode=a['mode']))
@@ -105,7 +115,10 @@ class Handler(BaseHTTPRequestHandler):
                 data=dict(revoked=auth.sign_out(a['account']))
             elif self.path=='/api/collect':
                 sid=int(a.get('snapshot_id',0));ids=a.get('people',[])
-                data=dict(id=store.collect(a.get('message_id',''),a.get('title',''),a.get('season',''),[p for p in squad(sid) if p['identity_key'] in ids]))
+                # A blank season follows the save, as it does for questions.
+                day=next((s['game_date'] for s in snapshots() if s['id']==sid),None)
+                season=(a.get('season') or '').strip() or (day and current_season(day)) or ''
+                data=dict(id=store.collect(a.get('message_id',''),a.get('title',''),season,[p for p in squad(sid) if p['identity_key'] in ids]))
             else:self.reply(dict(error='Unknown workspace action.'),404);return
             self.reply(data)
         except (ValueError,sqlite3.Error,auth.ConnectionFailure) as exc:self.reply(dict(error=str(exc)),400)
