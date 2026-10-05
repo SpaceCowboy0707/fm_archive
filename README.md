@@ -128,20 +128,6 @@ Archive browsing does not require a model call or a successful model catalogue r
 
 ## Data pipeline: game save → archive
 
-```mermaid
-flowchart LR
-    A[FM finishes saving] --> B[User triggers update or specifies a file]
-    B --> C[Stability and SHA-256 checks]
-    C --> D[Verified save backup]
-    D --> E[fmsave parsing and reader validation]
-    E --> F[Visible-field allowlist projection]
-    F --> G[Core players and extended statistics]
-    F --> H[Whole-team league snapshots]
-    G --> I[(archive.sqlite3)]
-    H --> I
-    I --> J[Data pages and read-only tools]
-```
-
 ### Importing a new save
 
 After FM finishes saving, an import is triggered with **Update latest save** on any archive page.
@@ -185,27 +171,6 @@ This is a **manually triggered import pipeline**, not a scheduled watcher. Impor
 Table names, columns and JSON keys are English. Data values may be multilingual. Some detailed records are stored as JSON payloads, not one physical column per metric; views expose selected fields as columns.
 
 ## Chat workflow: question → evidence → answer
-
-```mermaid
-flowchart TD
-    A[Question and selected scope] --> B[Validate and save message plus job]
-    B --> C{Recognized real-world weather request?}
-    C -->|Yes| D[Explain missing weather source locally]
-    C -->|No| E[Prepare bounded history, archive directory and tools]
-    E --> F[Model request]
-    F --> G{Tool call or answer?}
-    G -->|Tool| H[Validate name and arguments]
-    H --> I[Read-only parameterized SQL]
-    I --> J[Filter, deduplicate, paginate or calculate]
-    J --> K[Save evidence and return tool output]
-    K --> F
-    G -->|Answer| L{Evidence validation enabled?}
-    L -->|Yes| M[Validate structured answer]
-    M -->|Pass or coverage warning| N[Save analysis with limitations]
-    M -->|Hard failure| O[Save failure, queries and draft]
-    L -->|No| N
-    D --> N
-```
 
 1. The web client submits the question, snapshot, season and filters. The backend validates them and persists the question, assistant placeholder and job before generation.
 2. A background thread runs independently of page refreshes or conversation navigation. Stopping the Python service still interrupts it; restart marks abandoned jobs interrupted without silently resubmitting.
