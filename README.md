@@ -1,10 +1,27 @@
 # Leicester Dynasty Archive
 
-A local **Football Manager archive and AI analysis workspace**. Import game saves into SQLite, browse historical snapshots, inspect SQL, and ask an assistant to retrieve evidence, compare players and explain findings.
+A local **Football Manager archive and AI analysis workspace**: import FM save files into SQLite, browse historical snapshots, and ask an assistant questions that it answers from retrieved, checkable evidence.
+
+## Overview
+
+**Problem.** An FM save is a black box. Questions such as "how does my squad's attack compare with similar Premier League players?" need data across many saves, and an LLM left alone will invent numbers.
+
+**Approach.** A bounded **agentic analytics workflow** with a hard split between code and model:
+
+- **Deterministic pipeline, no model calls:** SHA-256 dedup, verified backup, `fmsave` parsing and validation, then a visible-field allowlist into SQLite. Hidden attributes such as CA/PA never enter the archive.
+- **Read-only agent:** the model chooses among 11 tools and their arguments (fixed parameterised SQL plus Python metrics) and may investigate over several rounds. It never writes SQL or touches the database directly.
+- **Evidence gate:** the final answer must cite exact fields in tool results. The program checks each cited value and type, makes one repair attempt on reference errors, and blocks answers that fail hard checks.
+
+**What to look at**
+- Tool design and validation: [`src/chat_tools.py`](src/chat_tools.py), [`src/evidence_gate.py`](src/evidence_gate.py)
+- Bounded tool loop and persistence: [`src/chat_auth.py`](src/chat_auth.py), [`src/web_chat.py`](src/web_chat.py)
+- Snapshot/season rules and import pipeline: [Data pipeline](#data-pipeline-game-save--archive)
+- Full execution trace (steps, SQL, usage) for every answer: [Logs, SQL and usage](#logs-sql-and-usage)
+- Honest limits: [Budgets and known limitations](#budgets-and-known-limitations)
+
+**Stack.** Python 3.12, SQLite, `fmsave`, a stdlib HTTP server with a vanilla HTML/CSS/JS frontend (no build step), optional Streamlit pages, `unittest` (synthetic data and mocked model responses, no live model calls). Local, loopback-only, bilingual UI (English/简体中文).
 
 Two separate conversation spaces share the archive: **Analysis** for football data and **Dressing room** for stories and headcanon. Fiction is not automatically promoted to game fact, and collecting a story is an explicit user action.
-
-This is a bounded **agentic analytics workflow**: the model selects tools and arguments, receives their results, and decides whether to investigate further or answer. Importing, SQL execution, metric calculations, validation and persistence are deterministic application code. The agent cannot freely modify the database or operate the computer.
 
 > Implementation guide, updated October 3, 2026. Available data depends on imported saves. Evidence checks do not guarantee that every natural-language conclusion is correct.
 
