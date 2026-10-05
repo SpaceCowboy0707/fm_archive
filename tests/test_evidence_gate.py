@@ -41,6 +41,19 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(partial_analysis('{"analysis":"cut \\'),'cut ')
         self.assertEqual(partial_analysis('{"analysis":"cut \\u4e'),'cut ')
         self.assertEqual(partial_analysis('{"analysis":"done","facts":[{"value":"x"}]}'),'done')
+    def test_display_rounds_long_decimals_but_facts_stay_exact(self):
+        from src.evidence_gate import tidy_numbers
+        self.assertEqual(tidy_numbers('rating 7.1461538461538465, xG 0.0123, date 2036-09-21, 7.25, v1.2.3'),'rating 7.15, xG 0.012, date 2036-09-21, 7.25, v1.2.3')
+        r=validate_answer(self.doc(10.123456),[self.query(10.123456)],'2036-03-04')
+        self.assertTrue(r['passed'])
+    def test_season_errors_are_patchable(self):
+        from src.evidence_gate import failed_references,missing_seasons,apply_fixes
+        season="Query season mismatch: query 1 uses 2035/36, but the answer season is 2036/37. If intended, add it"
+        self.assertEqual(failed_references([season]),[]);self.assertEqual(failed_references([season,'Reference 3: wrong']),[3])
+        self.assertIsNone(failed_references([season,'Invalid answer fields']));self.assertEqual(missing_seasons([season]),['2035/36'])
+        fixed,removed=apply_fixes(self.doc(),json.dumps(dict(fixes=[],other_seasons=['2034/35'])),[])
+        self.assertEqual((json.loads(fixed)['other_seasons'],removed),(['2034/35'],0))
+        with self.assertRaises(ValueError):apply_fixes(self.doc(),json.dumps(dict(fixes=[],other_seasons='2034/35')),[])
     def test_missing_both_players_and_title_evidence(self):
         self.assertTrue(validate_answer(self.doc(),[self.query()],'2036-03-04',"Compare two goalkeepers")['partial'])
         self.assertFalse(validate_answer(self.doc(),[self.query()],'2036-03-04',"Is the championship secure")['passed'])

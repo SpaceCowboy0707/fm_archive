@@ -4,7 +4,7 @@ import math
 import re
 from src.i18n import INPUT_ALIASES
 
-INSTRUCTIONS="Evidence validation is enabled. After querying, the final answer must be one JSON object without code fences: {\"season\":\"2035/36\",\"comparison_player_ids\":[],\"analysis\":\"Complete user-facing Markdown answer and limitations\",\"facts\":[{\"query\":0,\"path\":[\"rows\",0,\"goals\"],\"value\":10}]}. Write the keys in this order, analysis before facts: the analysis is shown to the user while you write. query is the query_index field printed in that tool result, path locates a scalar field in the result, and value must match exactly in value and type. Every record in a returned list carries its own row_index: use it as the list position in path (for example [\"rows\",<row_index>,\"goals\"]) and never count positions yourself. Copy values exactly as returned, without rounding. To show that no records were returned, a path may end at an empty list or object and cite [] or {}. Be concise by default: keep analysis to about 600 English words or 2,000 Chinese characters, lead with the judgment, keep tables to the metrics that decide it, keep the limitations and drop secondary metrics. In facts, cite the key numbers the conclusion rests on, about 40 at most. When the user asks for detail (for example in detail, all, \u8be6\u7ec6\u5c55\u5f00 or \u5168\u90e8), write a full analysis with complete tables and cite more numbers. Never more than 600 fact references. analysis must still answer the original question with numbers, not just a qualitative summary; explain derived calculations. Do not invent numbers or claim that all interpretation is program-verified. Start with a concise judgment, select relevant metrics, explain their meaning, then describe actual limitations. Similar minutes do not equal similar opponents, competitions or roles; more defensive events do not alone imply greater ability. For player comparisons, include both real identities and query each player_profile and season player_timeline(matches), completing relevant pages. season is the season being analyzed. When the answer also cites queries for other seasons, for example the last-season statistics of players who left in this transfer window, list those seasons in optional \"other_seasons\" and say in analysis which season each figure belongs to. Title-race questions must call title_race_status; the program publishes the mathematical condition, so analysis must not independently announce a clinch. Missing data still requires this structure. If all relevant queries fail or are empty, facts may be empty; explain attempted scope, actual errors, absent fields and unavailable conclusions. An unread unrelated page does not invalidate all available evidence. Analyze complete data without asserting totals for incomplete scopes. Missing profiles or opponents permit descriptions, not definitive replacement recommendations. Follow the requested response language for analysis; JSON keys and reference paths remain unchanged. Optionally add \"charts\", a list of at most 6 chart specs, when a chart shows the answer better than a table or when the user asks for one: {\"type\":\"bar|hbar|line|scatter|pie\",\"title\":\"...\",\"query\":<query_index>,\"records\":[\"rows\"],\"label\":\"player_name\",\"x\":\"expected_goals\",\"y\":[\"goals\"],\"sort\":\"desc|asc|none\",\"limit\":15,\"diagonal\":true}. query may also be a list of query_index values for the pages of one lookup, whose records are joined; records is the path to a list of records in that tool result; label names each bar, slice or point; x is required for scatter (numeric) and line (date, season or number); y is a list of numeric fields, one per series (scatter and pie take exactly one; bar, hbar and line up to three). Fields are names or short paths such as [\"totals\",2], which follows that result's metric_columns. Never write chart values yourself: the program reads every plotted value from the tool result, and a spec that does not resolve is dropped with its reason. Use hbar for long player names, pie only for parts of one whole (at most 8 slices; the rest fold into Other), diagonal for a y=x reference such as goals against xG. Place a chart inside analysis by writing [[chart:N]] on its own line (N counts from 1); charts not placed appear after the analysis."
+INSTRUCTIONS="Evidence validation is enabled. After querying, the final answer must be one JSON object without code fences: {\"season\":\"2035/36\",\"comparison_player_ids\":[],\"analysis\":\"Complete user-facing Markdown answer and limitations\",\"facts\":[{\"query\":0,\"path\":[\"rows\",0,\"goals\"],\"value\":10}]}. Write the keys in this order, analysis before facts: the analysis is shown to the user while you write. query is the query_index field printed in that tool result, path locates a scalar field in the result, and value must match exactly in value and type. Every record in a returned list carries its own row_index: use it as the list position in path (for example [\"rows\",<row_index>,\"goals\"]) and never count positions yourself. In facts, copy values exactly as returned, without rounding; in analysis, round for readability (ratings, xG and per-90 values to two decimals). To show that no records were returned, a path may end at an empty list or object and cite [] or {}. Match the length to the question: a narrow question (one player, one number or one comparison) gets a concise analysis of about 600 English words or 2,000 Chinese characters; a broad review (a season so far, the whole squad, several players or several aspects) gets a fuller structured analysis of up to about 1,200 English words or 4,000 Chinese characters, with a table for each aspect. Either way lead with the judgment, keep tables to the metrics that decide it, keep the limitations and drop secondary metrics. In facts, cite the key numbers the conclusion rests on, about 40 at most. When the user asks for detail (for example in detail, all, \u8be6\u7ec6\u5c55\u5f00 or \u5168\u90e8), write a full analysis with complete tables and cite more numbers. Never more than 600 fact references. analysis must still answer the original question with numbers, not just a qualitative summary; explain derived calculations. Do not invent numbers or claim that all interpretation is program-verified. Start with a concise judgment, select relevant metrics, explain their meaning, then describe actual limitations. Similar minutes do not equal similar opponents, competitions or roles; more defensive events do not alone imply greater ability. For player comparisons, include both real identities and query each player_profile and season player_timeline(matches), completing relevant pages. season is the season being analyzed. When the answer also cites queries for other seasons, for example the last-season statistics of players who left in this transfer window, list those seasons in optional \"other_seasons\" and say in analysis which season each figure belongs to. Title-race questions must call title_race_status; the program publishes the mathematical condition, so analysis must not independently announce a clinch. Missing data still requires this structure. If all relevant queries fail or are empty, facts may be empty; explain attempted scope, actual errors, absent fields and unavailable conclusions. An unread unrelated page does not invalidate all available evidence. Analyze complete data without asserting totals for incomplete scopes. Missing profiles or opponents permit descriptions, not definitive replacement recommendations. Follow the requested response language for analysis; JSON keys and reference paths remain unchanged. Optionally add \"charts\", a list of at most 6 chart specs, when a chart shows the answer better than a table or when the user asks for one: {\"type\":\"bar|hbar|line|scatter|pie\",\"title\":\"...\",\"query\":<query_index>,\"records\":[\"rows\"],\"label\":\"player_name\",\"x\":\"expected_goals\",\"y\":[\"goals\"],\"sort\":\"desc|asc|none\",\"limit\":15,\"diagonal\":true}. query may also be a list of query_index values for the pages of one lookup, whose records are joined; records is the path to a list of records in that tool result; label names each bar, slice or point; x is required for scatter (numeric) and line (date, season or number); y is a list of numeric fields, one per series (scatter and pie take exactly one; bar, hbar and line up to three). Fields are names or short paths such as [\"totals\",2], which follows that result's metric_columns. Never write chart values yourself: the program reads every plotted value from the tool result, and a spec that does not resolve is dropped with its reason. Use hbar for long player names, pie only for parts of one whole (at most 8 slices; the rest fold into Other), diagonal for a y=x reference such as goals against xG. Place a chart inside analysis by writing [[chart:N]] on its own line (N counts from 1); charts not placed appear after the analysis."
 
 
 def championship(rows,club_uid):
@@ -75,7 +75,19 @@ def partial_analysis(raw):
             out.append(escapes.get(raw[i+1],raw[i+1]));i+=2;continue
         out.append(c);i+=1
     text=''.join(out).encode('utf-16','surrogatepass').decode('utf-16','replace')
-    return re.sub(r'\[\[chart:\d+\]\]','',text)
+    return tidy_numbers(re.sub(r'\[\[chart:\d+\]\]','',text))
+
+
+# Long decimals are rounded for display only; facts keep the exact values the check compares.
+LONG_DECIMAL=re.compile(r'(?<![\w.])(-?\d+\.\d{3,})(?![\d.])')
+
+
+def tidy_numbers(text):
+    """Round long decimals in display text to two places (three below 0.1, so small rates stay visible)."""
+    def short(match):
+        value=float(match.group(1))
+        return f'{value:.3f}' if abs(value)<0.1 else f'{value:.2f}'
+    return LONG_DECIMAL.sub(short,text)
 
 
 def strip_fence(raw):
@@ -86,19 +98,30 @@ def strip_fence(raw):
 
 
 REFERENCE_ERROR=re.compile(r'^Reference (\d+): ')
+# An undeclared season is fixed by declaring it, which a patch can do without rewriting the text.
+SEASON_ERROR=re.compile(r'^Query season mismatch: query \d+ uses (\d{4}/\d{2}),')
 
 
 def failed_references(errors):
-    """Reference numbers when every error concerns an individual reference; otherwise None (needs a full rewrite)."""
-    numbers=[REFERENCE_ERROR.match(e) for e in errors]
-    return sorted({int(m.group(1)) for m in numbers}) if errors and all(numbers) else None
+    """Reference numbers when every error concerns an individual reference or an undeclared season;
+    otherwise None (needs a full rewrite). An empty list means only seasons need declaring."""
+    if not errors or not all(REFERENCE_ERROR.match(e) or SEASON_ERROR.match(e) for e in errors):return None
+    return sorted({int(m.group(1)) for m in map(REFERENCE_ERROR.match,errors) if m})
+
+
+def missing_seasons(errors):
+    return sorted({m.group(1) for m in map(SEASON_ERROR.match,errors) if m})
 
 
 def apply_fixes(raw,fixes_raw,failed):
     """Replace or drop only the failed references; the analysis text is kept verbatim. Returns (raw, removed)."""
     doc=json.loads(strip_fence(raw))
     fixes=json.loads(strip_fence(fixes_raw))
-    if not isinstance(fixes,dict) or not isinstance(fixes.get('fixes'),list):raise ValueError('Repair must be {"fixes":[...]}')
+    if not isinstance(fixes,dict) or not isinstance(fixes.get('fixes'),list) or not set(fixes)<={'fixes','other_seasons'}:raise ValueError('Repair must be {"fixes":[...],"other_seasons":[...]}')
+    if 'other_seasons' in fixes:
+        added=fixes['other_seasons']
+        if not isinstance(added,list) or not all(isinstance(x,str) and re.fullmatch(r'\d{4}/\d{2}',x) for x in added):raise ValueError("other_seasons must be a list of seasons")
+        doc['other_seasons']=sorted({*doc.get('other_seasons',[]),*added})
     replaced={}
     for fix in fixes['fixes']:
         if not isinstance(fix,dict) or set(fix)!={'reference','fact'} or fix['reference'] not in failed:raise ValueError("Each fix must name one failed reference")
@@ -199,7 +222,7 @@ def validate_answer(raw,queries,cutoff,question="",notes=()):
     if conclusions:text+="\n\n**Programmatic conclusion**\n\n"+'\n'.join(conclusions)
     charts,chart_notes=draw_charts(doc.get('charts'),queries)
     if not title_question:
-        text+='\n\n'+place_charts(doc['analysis'],charts)
+        text+='\n\n'+place_charts(tidy_numbers(doc['analysis']),charts)
         if chart_notes:text+='\n\n'+'\n'.join('- '+n for n in chart_notes)
     else:text+="\n\nOnly the program-verifiable points condition is published here, not title probabilities or unverified title claims."
     warnings=list(dict.fromkeys(warnings))

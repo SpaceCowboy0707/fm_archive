@@ -6,7 +6,7 @@ from src import chat_store as store,chat_auth as auth
 from src.archive import snapshots,squad
 from src.league_archive import current_season
 from src.chat_tools import ArchiveTools,TOOLS,AGENT_INSTRUCTIONS,LABELS
-from src.evidence_gate import INSTRUCTIONS,validate_answer,failed_references,apply_fixes,strip_fence,partial_analysis
+from src.evidence_gate import INSTRUCTIONS,validate_answer,failed_references,missing_seasons,apply_fixes,strip_fence,partial_analysis
 from src.chat_routing import unsupported_request
 from src.lore import load_lore
 from src.i18n import translate
@@ -80,7 +80,7 @@ def submit(a):
 REPAIR_INSTRUCTIONS="Your previous structured answer failed the evidence check. Return only the complete corrected JSON object. Fix every listed reference: query is the tool result's query_index, list positions are the record's row_index, and value is copied exactly from the tool result. If a statement cannot be supported by the tool results, remove its reference and soften or remove the statement. Do not invent values. No tools are available in this request.\n"
 
 
-PATCH_INSTRUCTIONS="Some evidence references in your structured answer failed the check. Do not rewrite the answer. Return only JSON of the form {\"fixes\":[{\"reference\":<number>,\"fact\":{\"query\":<query_index>,\"path\":[...],\"value\":<exact value>}}]} with exactly one fix per failed reference. query is the tool result's query_index, list positions are the record's row_index, and value is copied exactly from the tool result. Use \"fact\":null only when no tool result supports that reference. No tools are available in this request.\n"
+PATCH_INSTRUCTIONS="Some evidence references in your structured answer failed the check. Do not rewrite the answer. Return only JSON of the form {\"fixes\":[{\"reference\":<number>,\"fact\":{\"query\":<query_index>,\"path\":[...],\"value\":<exact value>}}]} with exactly one fix per failed reference (an empty list when none failed). When the errors name an undeclared season that the analysis really uses, also return \"other_seasons\":[...] listing it; the analysis must already say which season each figure belongs to. query is the tool result's query_index, list positions are the record's row_index, and value is copied exactly from the tool result. Use \"fact\":null only when no tool result supports that reference. No tools are available in this request.\n"
 
 
 def repair_answer(cfg,draft,verdict,queries,events,event,language_line):
@@ -95,8 +95,8 @@ def repair_answer(cfg,draft,verdict,queries,events,event,language_line):
         return draft,verdict
     failed=failed_references(verdict['errors'])
     event(dict(kind='evidence_repair',title="Sending evidence errors back for one repair attempt",details=dict(
-        mode='patch' if failed else 'rewrite',references=failed,errors=verdict['errors'],previous_draft=draft,evidence_characters=len(evidence),
-        note=("Only the failed references are regenerated; the analysis text is kept unchanged." if failed else "The whole answer is regenerated because the draft itself was invalid.")
+        mode='patch' if failed is not None else 'rewrite',references=failed,seasons=missing_seasons(verdict['errors']),errors=verdict['errors'],previous_draft=draft,evidence_characters=len(evidence),
+        note=("Only the failed references and undeclared seasons are fixed; the analysis text is kept unchanged." if failed is not None else "The whole answer is regenerated because the draft itself was invalid.")
              +" One tool-free model request with the same tool results; the result is checked again and published only if it passes.")))
     offset=sum(e.get('kind')=='model_request' for e in events)
     def shifted(e):
@@ -104,11 +104,12 @@ def repair_answer(cfg,draft,verdict,queries,events,event,language_line):
         event({**e,'details':{**d,'round':d['round']+offset,'phase':'repair'}} if 'round' in d else e)
     notes=[]
     try:
-        if failed:
+        if failed is not None:
             doc=json.loads(strip_fence(draft))
             failed_facts=[dict(reference=n,fact=doc['facts'][n-1],error=next(e for e in verdict['errors'] if e.startswith(f'Reference {n}:'))) for n in failed]
             inputs=[dict(role='user',content='Answer analysis, unchanged:\n'+doc['analysis']),
                     dict(role='user',content='Failed references:\n'+json.dumps(failed_facts,ensure_ascii=False)),
+                    *([dict(role='user',content='Undeclared seasons used by queries:\n'+json.dumps(missing_seasons(verdict['errors'])))] if missing_seasons(verdict['errors']) else []),
                     dict(role='user',content='Tool results by query_index:\n'+evidence)]
             fixes=''.join(auth.stream_reply(cfg['account'],cfg['model'],inputs,PATCH_INSTRUCTIONS,on_event=shifted,final_text_only=True))
             repaired,removed=apply_fixes(draft,fixes,failed)

@@ -107,6 +107,24 @@ class LeagueTests(unittest.TestCase):
         self.assertEqual(la.current_season('2036-08-04',self.db),'2035/36')
         self.assertIsNone(la.current_season('2036-01-01',self.db))
 
+    def test_team_totals_sum_players_and_rank_the_league(self):
+        p=payload('2036-10-28','2036/37')
+        for n,t in enumerate(p['teams']):
+            t['standing']={**dict.fromkeys(la.STANDING_FIELDS,0),'club_uid':t['club_uid'],'team_id':t['team_id'],'played':9,'goals_for':11+n,'goals_against':n}
+            t['stats'][0].update(expected_goals=5.0+n,tackles_completed=40,interceptions=None)
+            keeper=dict(t['stats'][0],player_uid=100+n,player_name='Keeper '+str(n),goals=0,expected_goals=0.0,goals_allowed=n,shots_on_target_faced=3*n,expected_goals_prevented=0.5,tackles_completed=1)
+            t['stats'].append(keeper)
+        la.store(p,self.db)
+        tools=ArchiveTools({'game_date':'2036-10-28'},self.db)
+        args=dict(season='2036/37',club_name='Club 3',section='totals',kind='league',offset=0)
+        row=tools.execute('league_team_data',args)['rows'][0]
+        self.assertEqual((row['players'],row['keepers'],row['goals'],row['goals_for'],row['goals_not_credited_to_players']),(2,1,10,14,4))
+        self.assertEqual((row['expected_goals'],row['expected_goals_per_match'],row['tackles_completed'],row['interceptions']),(8.0,0.89,41,None))
+        self.assertEqual((row['goals_allowed'],row['shots_on_target_faced'],row['keeper_on_target_xg_faced']),(3,9,3.5))
+        self.assertEqual((row['premier_league_rank']['expected_goals'],row['premier_league_rank']['goals_against']),(17,4))
+        cup=tools.execute('league_team_data',{**args,'kind':'cup'})['rows'][0]
+        self.assertEqual((cup['players'],cup['premier_league_rank']),(0,None));self.assertNotIn('played',cup)
+
     def test_offseason_skip_counts_as_done(self):
         save=Path(self.tmp.name)/'save.fm';save.write_bytes(b'save')
         digest=la.file_hash(save)

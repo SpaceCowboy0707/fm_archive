@@ -105,6 +105,14 @@ class WebJobTests(unittest.TestCase):
         kinds=[e['kind'] for e in m['workflow']]
         self.assertLess(kinds.index('evidence_check'),kinds.index('evidence_repair'));self.assertIn('evidence_recheck',kinds)
         self.assertEqual(next(e for e in m['workflow'] if e['kind']=='evidence_repair')['details']['mode'],'patch')
+    def test_undeclared_season_is_patched_without_rewriting(self):
+        first=json.dumps(dict(season='2036/37',comparison_player_ids=[],analysis="Last season (2035/36) rating 7.1461538461538465",facts=[dict(query=0,path=['rows',0,'goals'],value=4)]))
+        calls=self.run_with_repair(first,json.dumps(dict(fixes=[],other_seasons=['2035/36'])))
+        self.assertEqual(len(calls),2);self.assertTrue(any('Undeclared seasons used by queries' in m['content'] for m in calls[1][0][2]))
+        m=store.messages(self.room)[-1]
+        self.assertEqual(m['status'],'complete');self.assertIn("rating 7.15",m['text']);self.assertNotIn('7.146',m['text'])
+        repair=next(e for e in m['workflow'] if e['kind']=='evidence_repair')['details']
+        self.assertEqual((repair['mode'],repair['seasons']),('patch',['2035/36']))
     def run_with_repair(self,first,second):
         r=web.submit(self.args)
         tool=MagicMock();tool._data.return_value=[]

@@ -227,7 +227,7 @@ The save has no transfer history: it only shows each player's current club, join
 
 Use `identity_key` returned by player search, not an invented ID. Dates are game dates bounded by the selected snapshot. Use returned `next_offset` for pagination.
 
-`league_team_data.stats` contains **player competition statistics**, not an independent advanced team-statistics endpoint. `expected_goals` is player xG, `expected_assists` is xA, and goalkeeper `expected_goals_prevented` is not team xGA. “Not retrieved this time” does not establish “absent from the database.”
+`league_team_data.stats` contains **player competition statistics**. `expected_goals` is player xG, `expected_assists` is xA, and goalkeeper `expected_goals_prevented` is not team xGA. `league_team_data.totals` sums every player row of one team snapshot (including players who left; goalkeeper fields from goalkeeper rows) into team xG, shots, chance creation and defensive events, with Premier League ranks. Goals no player is credited with, mostly opponents' own goals, are reported separately. The save holds no opponent shot data, so there is no pre-shot team xGA; `keeper_on_target_xg_faced` (goals allowed plus expected goals prevented) measures on-target shot quality faced only. “Not retrieved this time” does not establish “absent from the database.”
 
 ## Validation and correction
 
