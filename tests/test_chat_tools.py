@@ -125,10 +125,12 @@ class ToolTests(unittest.TestCase):
             return {**dict.fromkeys(FINANCE_FIELDS),**dict(player=player,membership=membership,loan_end='2037-01-04' if membership=='loan_out' else None,wage_weekly=1)}
         data['players']=[record('Rotation',0,'squad_player'),record('Star',0,'star_player'),record('Loanee',0,'regular_starter',on_loan=True),
                          record('Kid',1,'youngster'),record('Away',0,'impact_sub','loan_out',club='Loan club')]
+        data['players'][1]['player']['nation_id']=150;data['players'][0]['player']['nation_id']=99999
         con.execute("UPDATE analytics_snapshots SET payload_json=? WHERE sha256='2'",(json.dumps(data),));con.commit();con.close()
         first=self.tools.execute('club_squad',dict(group='first_team',detail='summary',offset=0))
         self.assertEqual([r['name'] for r in first['rows']],['Star','Loanee','Rotation'])
         self.assertEqual((first['as_of'],first['counts']),('2036-02-11',dict(first_team=3,youth=1,loaned_out=1)))
+        self.assertEqual([(r['nation_id'],r['nation']) for r in first['rows'][::2]],[(150,'Italy'),(99999,None)])
         self.assertEqual(first['rows'][1]['loan_in_from'],'Parent');self.assertNotIn('attributes',first['rows'][0])
         away=self.tools.execute('club_squad',dict(group='loaned_out',detail='attributes',offset=0))['rows'][0]
         self.assertEqual((away['loaned_to'],away['loan_end'],away['attributes']['tackling']),('Loan club','2037-01-04',15))

@@ -30,7 +30,7 @@ TOOLS=[
     tool('story_memory',"Search imported conversation memory by player names or short keywords (Chinese or English). Current branch only; original excerpts include speaker and provenance. Use for remembered stories and relationships, never as verified FM statistics. Refine the query or paginate for more context.",query=string("Player names or focused story keywords"),offset=OFFSET),
     tool('squad_attack_comparison',"Read one complete Premier League snapshot and return every target-team player's league attack totals, per90, natural-position ranks and percentiles. No directory lookup or pagination required. Prefer this tool for whole-squad league comparisons.",season=string("For example 2035/36"),club_name=string("Target club: Club names are stored in Chinese; English or Chinese, full or short names, and club uids are accepted"),min_minutes={'type':'integer','minimum':0,'maximum':100000,'description':"Minimum league minutes for the comparison sample, usually 450; players below this threshold retain raw data but are not ranked"}) ,
     tool('title_race_status',"Calculate the strict maximum-points sufficient condition for a Premier League title using all 20 clubs. Tie-breaks are not modeled. Required for title-race questions.",season=string("For example 2035/36"),club_name=string("Target club: Club names are stored in Chinese; English or Chinese, full or short names, and club uids are accepted")),
-    tool('player_profile',"Required for selection comparisons: visible attributes and season statistics by competition at the selected cutoff. Combine with actual opponents from player_timeline; totals alone do not justify replacing a starter.",player_id=string("identity_key returned by find_players"),season=string("For example 2035/36")),
+    tool('player_profile',"Required for selection comparisons: nationality, visible attributes and season statistics by competition at the selected cutoff. Combine with actual opponents from player_timeline; totals alone do not justify replacing a starter.",player_id=string("identity_key returned by find_players"),season=string("For example 2035/36")),
     tool('league_team_data',"Whole-team snapshots for Premier League and tracked clubs. List teams first, then query a club's stats or roster. No contracts or injuries. Rosters are as of that Premier League snapshot (as_of), which stops between seasons; for the managed club's current squad use club_squad. section=totals returns program-computed team totals per club (team xG, shots, chance creation, defensive events, goalkeeper shots faced) with Premier League ranks; use it for team-level and defensive questions instead of adding player rows yourself.",
          season=string("For example 2035/36"),club_name=string("Club filter (Club names are stored in Chinese; English or Chinese, full or short names, and club uids are accepted); null means all clubs in that season's Premier League",True),
          section={'type':'string','enum':['teams','stats','roster','totals']},
@@ -48,7 +48,7 @@ TOOLS=[
          player_id=PLAYER,**DATES,offset=OFFSET),
     tool('transfer_history',"Read the managed club's player movements in a date range: signings, departures, youth intake, loans in and out, loan returns and loanees signed permanently. Movements are inferred from consecutive archived snapshots, with the window between them and an exact date when the save records one; displayed fees come only from imported transfer screenshots matched by player, direction and date. Screenshot events outside snapshot coverage are included too. Other clubs' transfers are not covered.",
          player_name=string("Player name fragment; null means all",True),**DATES,offset=OFFSET),
-    tool('club_squad',"The managed club's squad at the selected cutoff, read from the latest club snapshot at or before it: natural positions, age, squad status, contract end, loan state and youth-team slot, optionally with visible attributes. Use this for current squad size, depth and lineups; league_team_data rosters are as of the last Premier League snapshot and lag between seasons.",
+    tool('club_squad',"The managed club's squad at the selected cutoff, read from the latest club snapshot at or before it: natural positions, nationality, age, squad status, contract end, loan state and youth-team slot, optionally with visible attributes. Use this for current squad size, depth and lineups; league_team_data rosters are as of the last Premier League snapshot and lag between seasons.",
          group={'type':'string','enum':['first_team','youth','loaned_out','all'],'description':"first_team: registered first-team players including loanees in; youth: the club's two youth squads; loaned_out: own players at other clubs"},
          detail={'type':'string','enum':['summary','attributes'],'description':"attributes adds visible attributes and pages sooner"},offset=OFFSET),
 ]
@@ -89,6 +89,13 @@ def normalized(value):
 
 
 CLUB_ALIASES={uid:names for uid,names in json.loads((Path(__file__).resolve().parent.parent/'locales/club-aliases.json').read_text(encoding='utf-8')).items() if not uid.startswith('_')}
+NATIONS={int(k):v for k,v in json.loads((Path(__file__).resolve().parent.parent/'locales/nations.json').read_text(encoding='utf-8')).items() if not k.startswith('_')}
+
+
+def nationality(person):
+    """The save stores only a nation id (the parser marks it unconfirmed); names come from locales/nations.json."""
+    nid=person.get('nation_id')
+    return dict(nation_id=nid,nation=NATIONS.get(nid))
 CJK=re.compile(r'[\u3400-\u9fff]')
 
 
@@ -364,7 +371,7 @@ class ArchiveTools:
             for record in data['players']:
                 player=record.get('player') or {}
                 group='loaned_out' if record.get('membership')=='loan_out' else 'first_team' if player.get('team_slot')==0 else 'youth'
-                row=dict(**project(player,('identity_key','name','age','natural_positions','squad_status','team_slot','contract_end','club_join_date')),
+                row=dict(**project(player,('identity_key','name','age','natural_positions','squad_status','team_slot','contract_end','club_join_date')),**nationality(player),
                          loan_in_from=player.get('loan_parent_club_name') if player.get('on_loan') else None,
                          loaned_to=player.get('club_name') if group=='loaned_out' else None,loan_end=record.get('loan_end'))
                 if a['detail']=='attributes':row['attributes']={k:(player.get('attributes') or {}).get(k) for k in ATTRIBUTES}
@@ -372,7 +379,7 @@ class ArchiveTools:
             rank={s:i for i,s in enumerate(SQUAD_ORDER)}
             chosen=[r for g,rows in groups.items() if a['group'] in (g,'all') for r in rows]
             chosen.sort(key=lambda r:(rank.get(r['squad_status'],len(rank)),r['name'] or ''))
-            return self._page(chosen,offset,"The managed club's squad on as_of, the latest club snapshot at or before the cutoff. team_slot 0 is the first team; 1 and 2 are the club's youth squads. squad_status is the save's own label. loan_in_from marks a loanee in; loaned_to marks an own player out on loan. Positions are natural positions only; roles a manager uses players in are not recorded.",
+            return self._page(chosen,offset,"The managed club's squad on as_of, the latest club snapshot at or before the cutoff. team_slot 0 is the first team; 1 and 2 are the club's youth squads. squad_status is the save's own label. loan_in_from marks a loanee in; loaned_to marks an own player out on loan. Positions are natural positions only; roles a manager uses players in are not recorded. nation is the primary nationality only; second nationalities are not archived, and nation is null for an id not yet named.",
                               as_of=data['snapshot']['date'],counts={g:len(rows) for g,rows in groups.items()})
         if name=='transfer_history':
             if a['player_name'] is not None and CJK.search(a['player_name']):raise unmatched_player(a['player_name'],[])
@@ -391,7 +398,7 @@ class ArchiveTools:
             if not raw:raise ToolArgumentError('player_id',"No player profile with this identity_key at the selected cutoff. Call find_players and use a returned identity_key.",a['player_id'],"identity_key from find_players")
             person=json.loads(raw[0][0])
             stats=[project(r,(*SEASON_FIELDS,'period','as_of')) for r in season_rows(self._data(con)) if r['identity_key']==a['player_id'] and r['period']==a['season']]
-            return self._page([dict(**project(person,('name','birth_date','age','height_cm','club_name','natural_positions')),attributes=project(person.get('attributes',{}),ATTRIBUTES),attributes_as_of=raw[0][1])],0,
+            return self._page([dict(**project(person,('name','birth_date','age','height_cm','club_name','natural_positions')),**nationality(person),attributes=project(person.get('attributes',{}),ATTRIBUTES),attributes_as_of=raw[0][1])],0,
                 "Attributes describe the observation date, not the whole season. Competition splits overlap overall and must not be added. Selection comparisons require both players' competition roles, actual opponents, sample sizes and tactical needs; attributes alone do not establish who should start.",season_statistics=stats)
         data=self._data(con)
         if name=='archive_coverage':

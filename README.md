@@ -212,11 +212,11 @@ Defined in [`src/chat_tools.py`](src/chat_tools.py). Account, chat creation and 
 | `archive_coverage` | None | Snapshot dates, seasons and coverage; a directory is not detailed evidence |
 | `find_players` | `query`, `offset` | Find stable identities by name; resolve ambiguous names |
 | `season_statistics` | `season`, `player_id`, `kind`, `scope`, `offset` | Latest cumulative season metrics and derived rates; never sum duplicate observations |
-| `player_profile` | `player_id`, `season` | Visible attributes at the cutoff and season competition splits |
+| `player_profile` | `player_id`, `season` | Nationality, visible attributes at the cutoff and season competition splits |
 | `player_timeline` | `player_id`, `start_date`, `end_date`, `section`, `offset` | Cumulative snapshots or retained matches; match coverage can be incomplete |
 | `injury_history` | `player_id`, date range, `offset` | Occurrences and available expected returns; not proof of current absence |
 | `transfer_history` | `player_name`, date range, `offset` | Managed-club movements inferred from consecutive snapshots (window, exact date where recorded, other club where known), with fees only from matched screenshots; not other clubs' transfers |
-| `club_squad` | `group`, `detail`, `offset` | The managed club's squad from the latest club snapshot at the cutoff: positions, squad status, contract, loan state and youth slot, optionally visible attributes; use for current depth, unlike `league_team_data` rosters that stop between seasons |
+| `club_squad` | `group`, `detail`, `offset` | The managed club's squad from the latest club snapshot at the cutoff: positions, nationality, squad status, contract, loan state and youth slot, optionally visible attributes; use for current depth, unlike `league_team_data` rosters that stop between seasons |
 | `league_team_data` | `season`, `club_name`, `section`, `kind`, `offset` | Team directory, roster or player statistics; no league-wide contracts/injuries |
 | `squad_attack_comparison` | `season`, `club_name`, `min_minutes` | League attack totals, per90, natural-position ranks and percentiles; no overall ability score |
 | `title_race_status` | `season`, `club_name` | Strict maximum-points sufficient condition using 20 clubs; no tie-break or probability model |
